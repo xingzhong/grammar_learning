@@ -1,6 +1,8 @@
 import pprint 
 import numpy
 import operator
+#import matplotlib
+#import matplotlib.pyplot as plt
 from parsing import load
 
 
@@ -32,6 +34,5 @@ if  __name__ == '__main__':
         
     pprint.pprint( tokens[1:3] )
     diff = map(operator.and_, tokens[:-1], tokens[1:]) 
-    pprint.pprint( diff[:10] )
-    
+
     
