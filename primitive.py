@@ -3,7 +3,7 @@ import numpy
 import operator
 from parsing import load
 
-DEBUG = 1
+DEBUG = None
 
 class Place(object):
     def __init__(self, place, thing=set(), action=[]):
@@ -33,6 +33,7 @@ class Place(object):
             t3 = Place(place, thing=thing, action=action)
             if DEBUG : pprint.pprint ({"t1":t1, "t2":t2, "t3":t3, "type":"thing merge"})
             return t3
+            
         elif len(t1.thing & t2.thing) > 0 and t1.place[2] != t2.place[2]:
             # thing have common 
             place = max(t1.place, t2.place , key=lambda x: x[2])
@@ -41,37 +42,54 @@ class Place(object):
             t3 = Place(place, thing=thing, action=action)
             if DEBUG : pprint.pprint ({"t1":t1, "t2":t2, "t3":t3, "type":"action merge"})
             return t3
+            
         return None
     
     def __sub__(t1, t2):
         """
             overload "-" for find the metric distance 
         """
+        return numpy.linalg.norm(t1.place - t2.place)
             
-    
+
+def merge(places):
+    """
+    for each place, do a possible merge and return new places
+    """
+    candidate = {}
+    itersets = list(places)
+    for p1 in itersets:
+        if p1 not in places :
+            continue
+        candidate[p1] = {}
+        for p2 in places:
+            d = p1 - p2
+            if d:
+                candidate[p1][p2] = d
+        p3 = min(candidate[p1], key= lambda x: candidate[p1].get(x))
+        if p1 - p3 < 20:
+            p4 = p1 + p3
+            places.remove(p1)
+            places.remove(p3)
+            places.add(p4)
+                
+    return places
     
 if  __name__ == '__main__':
     print "hello Xingzhong"
     data = load('dataset/1-11200.xgtf')
 
-    places = []
-    for d in data :
+    places = set()
+    for d in data[:50] :
         for t in eval("range(%s+1)"%d[0]['framespan'].replace(":",",")):
             p = Place(
                 place = ( int(d[0]['x']), int(d[0]['y']), t ),
                 thing = set([int(d[1])]), 
                 )
-            places.append( p ) 
+            places.add( p ) 
             
-    
-    places = sorted(places, key=lambda x: x.place[2])
-    #pprint.pprint (places[:50]) 
-    for p1 in places[:10] :
-        for p2 in places[:10] :
-            p3 = p1+p2
-            if p3:
-                print p3
-    
-    
+    places = merge(places)
+    pprint.pprint (places) 
+
 
     
