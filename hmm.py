@@ -9,12 +9,11 @@ def debug(x):
   print "[debug]", x
   return x
 # TODO:  
-#   down-sampling
 #   partial tranining 
-startprob1 = np.array([0.4, 0.2, 0.4])
-transmat1 = np.array([[0.8, 0.1, 0.1], [0.4, 0.2, 0.4], [0.1, 0.1, 0.8]])
-means = np.array([[0.5*1e-2], [1e-6], [-0.5*1e-2]])
-covars = np.array([[1e-4], [1e-4], [1e-4]])
+startprob1 = np.array([0.7, 0.2, 0.1])
+transmat1 = np.array([[0.8, 0.15, 0.05], [0.2, 0.3, 0.5], [0.05, 0.15, 0.8]])
+means = np.array([[1e-3], [1e-6], [-1e-3]])
+covars = np.array([[1e-5], [1e-5], [1e-5]])
 
 model1 = hmm.GaussianHMM(3, 'diag', startprob1, transmat1)
 model1.means_ = means
@@ -42,23 +41,31 @@ score1 = []
 score2 = []
 for i in range(len(logRet)):
   print "%s/%s"%(i, len(logRet))
-  for j in range(i+16, min(len(logRet), i+5*16)):
+  for j in range(i+8, min(len(logRet), i+16*16)):
     w = logRet[i:j]
     xvals = np.linspace(dates[i], dates[j], N)
     w_interp = np.interp(xvals, dates[i:j], w)
     w_interp = np.array([w_interp]).T
-    score1.append([model1.score(w_interp), i, j])
-    score2.append([model2.score(w_interp), i, j])
+    score1.append([model1.score(w_interp), i, j, xvals, w_interp])
+    score2.append([model2.score(w_interp), i, j, xvals, w_interp])
 
-w1 = sorted(score1, key=lambda x: x[0])[-1:]
-w2 = sorted(score2, key=lambda x: x[0])[-1:]
+w1 = sorted(score1, key=lambda x: x[0])[-2:]
+w2 = sorted(score2, key=lambda x: x[0])[-2:]
 debug(w1)
 debug(w2)
 fig = plt.figure()
-ax = fig.add_subplot(211)
+ax = fig.add_subplot(411)
 ax.plot_date(dates, close, "-o")
-bx = fig.add_subplot(212)
+bx = fig.add_subplot(412)
 bx.plot_date(dates, logRet, "-o")
+cx = fig.add_subplot(425)
+cx.plot_date(w1[0][3], w1[0][4], "-o", color='g')
+dx = fig.add_subplot(426)
+dx.plot_date(w2[0][3], w2[0][4], "-o", color='r')
+ex = fig.add_subplot(427)
+ex.plot_date(w1[1][3], w1[1][4], "-o", color='g')
+fx = fig.add_subplot(428)
+fx.plot_date(w2[1][3], w2[1][4], "-o", color='r')
 for ww in w1:
   ax.axvspan(dates[ww[1]], dates[ww[2]], facecolor='g', alpha=0.5)
   bx.axvspan(dates[ww[1]], dates[ww[2]], facecolor='g', alpha=0.5)
