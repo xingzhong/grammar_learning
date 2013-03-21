@@ -9,7 +9,7 @@ logret <- zoo(100*diff(log(price))[-1,])
 
 source("./eval.R")
 test <- rollapply(logret, width = 20, 
-                  by = 20,
+                  by = 5,
                   align = "left",
                   FUN = evalModel,
                   response = logret~1
