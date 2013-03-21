@@ -1,9 +1,9 @@
 library("depmixS4")
 library("quantmod")
-library("zoo")
+
 getSymbols("uup", src="yahoo")
 Nsma <- 7
-price <- SMA( UUP["2012-06-09/2012-09-01"][, 4], Nsma)
+price <- SMA( UUP["2012-01-01/2013-01-01"][, 4], Nsma)
 price <- price[!is.na(price[,1])]
 logret <- 100*diff(log(price))[-1,]
 ret <- data.frame(logret = logret)
@@ -11,7 +11,7 @@ ret <- data.frame(logret = logret)
 
 set.seed(2)
 mod <- depmix(
-  response = logret~1,
+  response = UUP.Close.SMA.7~1,
   data = ret,
   nstates = 3,
   instart = c (0.8, 0.1, 0.1),    # init state P
@@ -24,10 +24,18 @@ mod <- depmix(
 )
 
 fb <- forwardbackward(mod)
+scale <- as.xts(-log(fb$sca), order.by=index(price[-1]))
+
 print(fb)
-par(mfrow=c(2,1)) 
-plot(price)
-plot(log(fb$sca), type="l")
+par(mfrow=c(1,1)) 
+plot(price, ylim=c(20,23))
+par(new=TRUE)
+plot(scale, yaxt="n", ann=FALSE, ylim=c(-5,10))
+axis(side=4)
+mins <- scale[rank(scale, ties.method="first")<10]
+
+abline(v=.index(mins), col="blue",pch=22,lty=2)
+#plot.zoo(merge(scale,price), screens=c(1))
 
 # likihood are calculated through the summation of the scale factor. 
 # Therefore, by finding the minimum peroid of scale factors, 
