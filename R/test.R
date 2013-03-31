@@ -7,11 +7,12 @@ price <- SMA( UUP["2012-01-01/2013-01-01"][, 4], Nsma)
 price <- price[!is.na(price[,1])]
 logret <- 100*diff(log(price))[-1,]
 ret <- data.frame(logret = logret)
+colnames(ret) <- "logret"
 # logret is the log return of the given series
 
 set.seed(2)
 mod <- depmix(
-  response = UUP.Close.SMA.7~1,
+  response = logret~1,
   data = ret,
   nstates = 3,
   instart = c (0.8, 0.1, 0.1),    # init state P
