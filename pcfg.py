@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 from scipy.stats import norm
 from pprint import pprint
-from nltk.grammar import Nonterminal
+from nltk.grammar import Nonterminal, WeightedGrammar, parse_grammar, standard_nonterm_parser
 from nltk.parse.chart import Chart, LeafEdge, TreeEdge, AbstractChartRule
 from nltk.parse.pchart import *
 from nltk.tree import ProbabilisticTree
@@ -11,18 +11,12 @@ from nltk.tree import ProbabilisticTree
 import matplotlib.pyplot as plt
 
 
-MODELS = {
-    Nonterminal('top') : lambda x: norm.pdf(x, loc=0, scale=0.3),
-    Nonterminal('up') : lambda x: norm.pdf(x, loc=0.2, scale=0.1),
-    Nonterminal('down') : lambda x: norm.pdf(x, loc=-0.2, scale=0.1),
-}
-
 class ProbabilisticEmissionRule(AbstractChartRule):
   NUM_EDGES = 3
   def apply_iter(self, chart, grammar, edge):
     if not isinstance(edge, ProbabilisticLeafEdge):
       return
-    for state, model in MODELS.iteritems():  #FIXME
+    for state, model in grammar.emission().iteritems():
       prob = model(edge.lhs())
       new_edge = ProbabilisticTreeEdge(prob, 
                                    (edge.start(), edge.start()),
@@ -30,35 +24,8 @@ class ProbabilisticEmissionRule(AbstractChartRule):
       if chart.insert(new_edge, ()):
         yield new_edge
 
-class ProbabilisticBottomUpPredictRuleDup(AbstractChartRule):
-  NUM_EDGES = 1
-  def apply_iter(self, chart, grammar, edge):
-    if edge.is_incomplete(): return
-    for prod in grammar.productions():
-      if edge.lhs() == prod.rhs()[0]:
-        new_edge = ProbabilisticTreeEdge.from_production(prod, edge.start(), prod.prob())
-        if chart.insert(new_edge, ()):
-          yield new_edge
-
-class ProbabilisticBottomUpSignalInitRule(AbstractChartRule):
-  NUM_EDGES=0
-  def apply_iter(self, chart, grammar):
-    for index in range(chart.num_leaves()):
-      new_edge = ProbabilisticLeafEdge(chart.leaf(index), index)
-      if chart.insert(new_edge, ()):
-        yield new_edge
-      #for leaf, model in MODELS.iteritems():  #FIXME
-        # given the output chart.leaf(index),
-        # figure out the related state and prob
-        # prob should be based on the model
-        # leaf should be based on the model
-        #prob = model(chart.leaf(index))
-        #new_edge = ProbabilisticLeafEdge(prob, leaf, index )
-        #if chart.insert(new_edge, ()):
-        #  yield new_edge
-
 class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
-  def _setprob(self, tree, prod_probs):
+  def _setprob(self, tree, prod_probs, emission):
     if tree.prob() is not None : return 
     lhs = Nonterminal(tree.node)
     rhs = []
@@ -72,11 +39,11 @@ class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
       prob = prod_probs[lhs, tuple(rhs)]
     else:
       # continuse output
-      prob = MODELS[lhs](rhs[0])
+      prob = emission[lhs](rhs[0])
 
     for child in tree:
       if isinstance(child, Tree):
-        self._setprob(child, prod_probs)
+        self._setprob(child, prod_probs, emission)
         prob *= child.prob()
 
     tree.set_prob(prob)
@@ -98,8 +65,6 @@ class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
         print('  %-50s [%s]' % (chart.pp_edge(edge,width=2),
                                 edge.prob()))
       queue.append(edge)
-
-    print "finish"
     
     while len(queue) > 0:
       self.sort_queue(queue, chart)
@@ -122,22 +87,45 @@ class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
     for prod in grammar.productions():
       prod_probs[prod.lhs(), prod.rhs()] = prod.prob()
 
-    pprint (prod_probs)
     for parse in parses:
-      self._setprob(parse, prod_probs)
+      self._setprob(parse, prod_probs, grammar.emission())
 
     parses.sort(reverse=True, key=lambda tree: tree.prob())
 
     return parses[:n]
 
+class ContinuousWeightedGrammar(WeightedGrammar):
+  #FIXME accept generative matrix
+  def __init__(self, emission, *args, **kwargs):
+    WeightedGrammar.__init__(self, *args, **kwargs)
+    self._emission = emission
 
+  def emission(self):
+    return self._emission
 
+def parse_cpcfg(input, emission, encoding=None):
+  start , production = parse_grammar(input, standard_nonterm_parser,probabilistic=True)
+  return ContinuousWeightedGrammar(emission, start, production)
 
-toy_pcfg = nltk.parse_pcfg("""
+emission = {
+    Nonterminal('top') : lambda x: norm.pdf(x, loc=0, scale=0.3),
+    Nonterminal('up') : lambda x: norm.pdf(x, loc=0.2, scale=0.1),
+    Nonterminal('down') : lambda x: norm.pdf(x, loc=-0.2, scale=0.1),
+}
+
+g = parse_cpcfg("""
   S -> UP TOP DOWN [1.0]
   TOP -> top TOP [0.87] | top [0.13]
   UP -> up UP [0.92] | up [0.08]
   DOWN -> down DOWN [0.92] | down [0.08]
+""", emission)
+
+
+
+toy_pcfg2 = nltk.parse_pcfg("""
+    S -> DOWN UP [1.0]
+    UP -> up UP [0.8] | up [0.2] 
+    DOWN -> down DOWN [0.8] | down [0.2]
 """)
 
 toy_hmm = nltk.parse_pcfg("""
@@ -152,9 +140,7 @@ toy_response = {
     1 : (lambda x : np.random.normal(0.2, 0.01, 1)),
     2 : (lambda x : np.random.normal(-0.2, 0.01, 1)),
 }
-
-print toy_pcfg
-print toy_hmm
+# TODO put sampling into grammar class
 def sampling(grammar, item=None):
   if not item:
     item = grammar.start()
@@ -169,15 +155,14 @@ def sampling(grammar, item=None):
     s = toy_response[item]
     yield (item, s(1))
 
-hmm = itertools.islice( sampling(toy_hmm), 300)
-pcfg = itertools.islice( sampling(toy_pcfg), 300)
+#hmm = itertools.islice( sampling(toy_hmm), 300)
+#pcfg = itertools.islice( sampling(toy_pcfg), 300)
 
 #text = list("111000222")
 text = [0.1, 0.2, 0.22, 0.05, 0.0, -0.2, -0.11, -0.08]
-parser = InsideChartSignalParser(toy_pcfg)
+parser = InsideChartSignalParser(g)
 parser.trace(2)
-for p in parser.nbest_parse(text, n=5):
-  print p
+parser.nbest_parse(text)
 
 #fig = plt.figure()
 #ax = fig.add_subplot(211)
