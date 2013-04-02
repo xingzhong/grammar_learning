@@ -16,9 +16,9 @@ class ProbabilisticEmissionRule(AbstractChartRule):
   def apply_iter(self, chart, grammar, edge):
     if not isinstance(edge, ProbabilisticLeafEdge):
       return
-    for state, model in grammar.emission().iteritems():
+    for state, model in grammar.density().iteritems():
       prob = model(edge.lhs())
-      new_edge = ProbabilisticTreeEdge(prob, 
+      new_edge = ProbabilisticTreeEdge(prob,
                                    (edge.start(), edge.start()),
                                    state, [edge.lhs()], 0)
       if chart.insert(new_edge, ()):
@@ -26,7 +26,7 @@ class ProbabilisticEmissionRule(AbstractChartRule):
 
 class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
   def _setprob(self, tree, prod_probs, emission):
-    if tree.prob() is not None : return 
+    if tree.prob() is not None : return
     lhs = Nonterminal(tree.node)
     rhs = []
     for child in tree:
@@ -65,7 +65,7 @@ class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
         print('  %-50s [%s]' % (chart.pp_edge(edge,width=2),
                                 edge.prob()))
       queue.append(edge)
-    
+
     while len(queue) > 0:
       self.sort_queue(queue, chart)
 
@@ -82,35 +82,55 @@ class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
       queue.extend(fr.apply(chart, grammar, edge))
 
     parses = chart.parses(grammar.start(), ProbabilisticTree)
-    
+
     prod_probs = {}
     for prod in grammar.productions():
       prod_probs[prod.lhs(), prod.rhs()] = prod.prob()
 
     for parse in parses:
-      self._setprob(parse, prod_probs, grammar.emission())
+      self._setprob(parse, prod_probs, grammar.density())
 
     parses.sort(reverse=True, key=lambda tree: tree.prob())
 
     return parses[:n]
 
 class ContinuousWeightedGrammar(WeightedGrammar):
-  #FIXME accept generative matrix
-  def __init__(self, emission, *args, **kwargs):
+  def __init__(self, emission, density, *args, **kwargs):
     WeightedGrammar.__init__(self, *args, **kwargs)
     self._emission = emission
+    self._density = density
 
   def emission(self):
     return self._emission
+  def density(self):
+    return self._density
+  def sampler(self, n=20):
+    return itertools.islice( self.sampling(), n)
+  def sampling(self, item=None):
+    if not item:
+      item = self.start()
+    prods = self.productions(lhs = item)
+    if len(prods)>0:
+      choose = np.random.choice(prods, 1, p=[x.prob() for x in prods])[0]
+      for rhs in choose.rhs():
+        for s in self.sampling (item=rhs):
+          yield s
+    else:
+      yield (item, self._emission[item](1))
 
-def parse_cpcfg(input, emission, encoding=None):
+def parse_cpcfg(input, emission, density,  encoding=None):
   start , production = parse_grammar(input, standard_nonterm_parser,probabilistic=True)
-  return ContinuousWeightedGrammar(emission, start, production)
+  return ContinuousWeightedGrammar(emission,density, start, production)
 
-emission = {
+densityEmission = {
     Nonterminal('top') : lambda x: norm.pdf(x, loc=0, scale=0.3),
     Nonterminal('up') : lambda x: norm.pdf(x, loc=0.2, scale=0.1),
     Nonterminal('down') : lambda x: norm.pdf(x, loc=-0.2, scale=0.1),
+}
+emission = {
+    Nonterminal('top') : lambda x: norm.rvs(loc=0, scale=0.3, size=x),
+    Nonterminal('up') : lambda x: norm.rvs(loc=0.2, scale=0.1, size=x),
+    Nonterminal('down') : lambda x: norm.rvs(loc=-0.2, scale=0.1, size=x),
 }
 
 g = parse_cpcfg("""
@@ -118,13 +138,14 @@ g = parse_cpcfg("""
   TOP -> top TOP [0.87] | top [0.13]
   UP -> up UP [0.92] | up [0.08]
   DOWN -> down DOWN [0.92] | down [0.08]
-""", emission)
+""", emission, densityEmission)
 
+print list(g.sampler(n=40))
 
 
 toy_pcfg2 = nltk.parse_pcfg("""
     S -> DOWN UP [1.0]
-    UP -> up UP [0.8] | up [0.2] 
+    UP -> up UP [0.8] | up [0.2]
     DOWN -> down DOWN [0.8] | down [0.2]
 """)
 
@@ -135,34 +156,11 @@ toy_hmm = nltk.parse_pcfg("""
   DOWN -> '2' DOWN [0.92] | TOP [0.08]
 """)
 
-toy_response = {
-    0 : (lambda x : np.random.normal(0.0, 0.02, 1)),
-    1 : (lambda x : np.random.normal(0.2, 0.01, 1)),
-    2 : (lambda x : np.random.normal(-0.2, 0.01, 1)),
-}
-# TODO put sampling into grammar class
-def sampling(grammar, item=None):
-  if not item:
-    item = grammar.start()
-  if isinstance(item, Nonterminal):
-    prods = grammar.productions(lhs=item)
-    choose = np.random.choice(prods, 1, p=[x.prob() for x in prods])[0]
-    for rhs in choose.rhs():
-      for s in sampling(grammar, item=rhs):
-        yield s
-  else:
-    item = int(item)
-    s = toy_response[item]
-    yield (item, s(1))
-
-#hmm = itertools.islice( sampling(toy_hmm), 300)
-#pcfg = itertools.islice( sampling(toy_pcfg), 300)
-
 #text = list("111000222")
-text = [0.1, 0.2, 0.22, 0.05, 0.0, -0.2, -0.11, -0.08]
-parser = InsideChartSignalParser(g)
-parser.trace(2)
-parser.nbest_parse(text)
+#text = [0.1, 0.2, 0.22, 0.05, 0.0, -0.2, -0.11, -0.08]
+#parser = InsideChartSignalParser(g)
+#parser.trace(2)
+#parser.nbest_parse(text)
 
 #fig = plt.figure()
 #ax = fig.add_subplot(211)
