@@ -141,6 +141,7 @@ if __name__ == "__main__":
     S2 -> S1 [0.3] | s2 S2 [0.5] | S3 [0.2]
     S3 -> S1 [0.3] | S2 [0.3] | s3 S3 [0.4]
     """, emission, densityEmission)
+  # seems like each production has to have one output.
 
   from sklearn import hmm
   startprob = np.array([0.6, 0.3, 0.1])
