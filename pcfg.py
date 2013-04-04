@@ -122,49 +122,48 @@ def parse_cpcfg(input, emission, density,  encoding=None):
   start , production = parse_grammar(input, standard_nonterm_parser,probabilistic=True)
   return ContinuousWeightedGrammar(emission,density, start, production)
 
-densityEmission = {
-    Nonterminal('top') : lambda x: norm.pdf(x, loc=0, scale=0.3),
-    Nonterminal('up') : lambda x: norm.pdf(x, loc=0.2, scale=0.1),
-    Nonterminal('down') : lambda x: norm.pdf(x, loc=-0.2, scale=0.1),
-}
-emission = {
-    Nonterminal('top') : lambda x: norm.rvs(loc=0, scale=0.3, size=x),
-    Nonterminal('up') : lambda x: norm.rvs(loc=0.2, scale=0.1, size=x),
-    Nonterminal('down') : lambda x: norm.rvs(loc=-0.2, scale=0.1, size=x),
-}
+if __name__ == "__main__":
+  #TODO: use current HMM example to verify the results
+  densityEmission = {
+      Nonterminal('s1') : lambda x: norm.pdf(x, loc=0, scale=1),
+      Nonterminal('s2') : lambda x: norm.pdf(x, loc=20, scale=1),
+      Nonterminal('s3') : lambda x: norm.pdf(x, loc=-20, scale=1),
+  }
+  emission = {
+      Nonterminal('s1') : lambda x: norm.rvs(loc=0, scale=1, size=x),
+      Nonterminal('s2') : lambda x: norm.rvs(loc=20, scale=1, size=x),
+      Nonterminal('s3') : lambda x: norm.rvs(loc=-20, scale=1, size=x),
+  }
 
-g = parse_cpcfg("""
-  S -> UP TOP DOWN [1.0]
-  TOP -> top TOP [0.87] | top [0.13]
-  UP -> up UP [0.92] | up [0.08]
-  DOWN -> down DOWN [0.92] | down [0.08]
-""", emission, densityEmission)
+  g = parse_cpcfg("""
+    S -> S1 [0.6] | S2 [0.3]| S3 [0.1]
+    S1 -> s1 S1 [0.7] | S2 [0.2] | S3 [0.1]
+    S2 -> S1 [0.3] | s2 S2 [0.5] | S3 [0.2]
+    S3 -> S1 [0.3] | S2 [0.3] | s3 S3 [0.4]
+    """, emission, densityEmission)
 
-print list(g.sampler(n=40))
+  from sklearn import hmm
+  startprob = np.array([0.6, 0.3, 0.1])
+  transmat = np.array([[0.7, 0.2, 0.1], [0.3, 0.5, 0.2], [0.3, 0.3, 0.4]])
+  means = np.array([[0], [20], [-20]])
+  covars = np.tile(np.identity(1), (3,1,1))
+  model = hmm.GaussianHMM(3, 'full', startprob, transmat)
+  model.means_ = means
+  model.covars_ = covars
+  X, Z = model.sample(5)
+  
+  print means
+  print covars
+  print model.score(X)
+  print X
+  print Z
+  print g
+  parser = InsideChartSignalParser(g)
+  parser.trace(3)
+  X = list(X.flat)
+  parses = parser.nbest_parse([0, 0, 0, 0, 20])
+  # cannot parse it well TODO
+  for p in parses:
+    print p
 
-
-toy_pcfg2 = nltk.parse_pcfg("""
-    S -> DOWN UP [1.0]
-    UP -> up UP [0.8] | up [0.2]
-    DOWN -> down DOWN [0.8] | down [0.2]
-""")
-
-toy_hmm = nltk.parse_pcfg("""
-  S -> UP [1.0]
-  UP -> '1' UP [0.92] | TOP [0.08]
-  TOP -> '0' TOP [0.87] | DOWN [0.10] | UP [0.03]
-  DOWN -> '2' DOWN [0.92] | TOP [0.08]
-""")
-
-#text = list("111000222")
-#text = [0.1, 0.2, 0.22, 0.05, 0.0, -0.2, -0.11, -0.08]
-#parser = InsideChartSignalParser(g)
-#parser.trace(2)
-#parser.nbest_parse(text)
-
-#fig = plt.figure()
-#ax = fig.add_subplot(211)
-#ax.plot(sample[:,1])
-#bx = fig.add_subplot(212)
-#bx.plot(np.cumsum(sample[:,1]))
-#plt.show()
+  print list(g.sampler(n=10))
