@@ -10,6 +10,8 @@ from nltk.tree import ProbabilisticTree
 
 import matplotlib.pyplot as plt
 
+class CProbabilisticLeafEdge(ProbabilisticLeafEdge):
+  def logprob(self): return 0;
 
 class ProbabilisticEmissionRule(AbstractChartRule):
   NUM_EDGES = 3
@@ -44,7 +46,7 @@ class InsideChartSignalParser(nltk.parse.pchart.InsideChartParser):
     for child in tree:
       if isinstance(child, Tree):
         self._setprob(child, prod_probs, emission)
-        prob *= child.prob()
+        prob += child.prob()
 
     tree.set_prob(prob)
 
@@ -125,9 +127,9 @@ def parse_cpcfg(input, emission, density,  encoding=None):
 if __name__ == "__main__":
   #TODO: use current HMM example to verify the results
   densityEmission = {
-      Nonterminal('s1') : lambda x: norm.pdf(x, loc=0, scale=1),
-      Nonterminal('s2') : lambda x: norm.pdf(x, loc=20, scale=1),
-      Nonterminal('s3') : lambda x: norm.pdf(x, loc=-20, scale=1),
+      Nonterminal('s1') : lambda x: norm.logpdf(x, loc=0, scale=1),
+      Nonterminal('s2') : lambda x: norm.logpdf(x, loc=20, scale=1),
+      Nonterminal('s3') : lambda x: norm.logpdf(x, loc=-20, scale=1),
   }
   emission = {
       Nonterminal('s1') : lambda x: norm.rvs(loc=0, scale=1, size=x),
@@ -137,9 +139,9 @@ if __name__ == "__main__":
 
   g = parse_cpcfg("""
     S -> S1 [0.6] | S2 [0.3]| S3 [0.1]
-    S1 -> s1 S1 [0.7] | S2 [0.2] | S3 [0.1]
-    S2 -> S1 [0.3] | s2 S2 [0.5] | S3 [0.2]
-    S3 -> S1 [0.3] | S2 [0.3] | s3 S3 [0.4]
+    S1 -> s1 S1 [0.7] | S1 S2 [0.2] | S1 S3[0.0999] | s1 [0.0001]
+    S2 -> S2 S1 [0.7] | s2 S2 [0.2] | S2 S3[0.0999] | s2 [0.0001]
+    S3 -> S3 S1 [0.7] | S3 S2 [0.2] | s3 S3[0.0999] | s3 [0.0001]
     """, emission, densityEmission)
   # seems like each production has to have one output.
 
@@ -151,20 +153,15 @@ if __name__ == "__main__":
   model = hmm.GaussianHMM(3, 'full', startprob, transmat)
   model.means_ = means
   model.covars_ = covars
-  X, Z = model.sample(5)
-  
-  print means
-  print covars
-  print model.score(X)
-  print X
-  print Z
-  print g
+  X, Z = model.sample(6)
+
   parser = InsideChartSignalParser(g)
   parser.trace(3)
   X = list(X.flat)
-  parses = parser.nbest_parse([0, 0, 0, 0, 20])
+  #parses = parser.nbest_parse([0, 0], n=3)
   # cannot parse it well TODO
-  for p in parses:
-    print p
+  #for p in parses:
+  #  ContextFreeGrammarprint p
+  #  print p.pprint(parens=u'[]')
 
-  print list(g.sampler(n=10))
+  #print list(g.sampler(n=10))
