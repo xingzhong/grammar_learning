@@ -32,4 +32,8 @@ model = pcfg.BasePCFG(grammar=g)
 
 print g
 print s
-print model.decode(s)
+lik, t = model.decode(s)
+
+print t
+
+t.draw()

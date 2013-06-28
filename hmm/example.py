@@ -5,7 +5,7 @@ from scipy.stats import norm
 import hmm
 import numpy as np
 
-states = ('A', 'B', 'C')
+states = (("A", "Left"), ("B", "Left"), ("C", "Left"), ("A", "Right"))
 symbols = ('a', 'b', 'c')
 
 start_prob = {
