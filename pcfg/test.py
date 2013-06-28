@@ -1,23 +1,30 @@
-import unittest
-from production import *
+from sklearn.mixture import log_multivariate_normal_density
+import numpy as np 
 
-class test(unittest.TestCase):
-	def setUp(self):
-		self.production = Productions()
-		self.production[(NT('S'), (None, NT('A'), None))] = 0.33
-		self.production[(NT('S'), (None, NT('B'), None))] = 0.33
-		self.production[(NT('S'), (None, NT('C'), None))] = 0.33
-		self.production[(NT('A'), (T('a'), NT('A'), T('a')))] = 0.6
-		self.production[(NT('A'), (T('a'), NT('B'), T('a')))] = 0.3
-		self.production[(NT('A'), (None,))] = 0.1
-		self.production[(NT('B'), (T('b'), NT('A'), None))] = 0.33
-		self.production[(NT('B'), (T('b'), NT('B'), None))] = 0.33
-		self.production[(NT('B'), (T('b'), NT('C'), None))] = 0.33
-		self.production[(NT('B'), (None,))] = 0.01
-		self.production[(NT('C'), (None, NT('B'), T('c')))] = 0.6
-		self.production[(NT('C'), (None, NT('C'), T('c')))] = 0.3
-		self.production[(NT('C'), (None,))] = 0.1
+def _log_multivariate_normal_density_diag(X, means=0.0, covars=1.0):
+	"""Compute Gaussian log-density at X for a diagonal model"""
+	n_samples, n_dim = X.shape
+	#import pdb; pdb.set_trace()
+	lpr = -0.5 * (n_dim * np.log(2 * np.pi) + np.sum(np.log(covars), 1)
+                  + np.sum((means ** 2) / covars, 1)
+                  - 2 * np.dot(X, (means / covars).T)
+                  + np.dot(X ** 2, (1.0 / covars).T))
+	return lpr
+
+def dmvnorm(b, mean, cov):
+	k = b.shape[0]
+	part1 = np.exp(-0.5*k*np.log(2*np.pi))
+	part2 = np.power(np.linalg.det(cov),-0.5)
+	dev = b-mean
+	part3 = np.exp(-0.5*np.dot(np.dot(dev.transpose(),np.linalg.inv(cov)),dev))
+	dmvnorm = part1*part2*part3
+	return dmvnorm
 
 
-if __name__ == '__main__':
-    unittest.main()
+
+X = np.array([0.2,1,0.1])
+mean = np.array([0,1,1])
+covar = np.identity(3)
+
+print X, mean, covar
+print dmvnorm(X, mean, covar)
