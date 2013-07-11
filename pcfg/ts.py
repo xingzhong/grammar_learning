@@ -41,9 +41,9 @@ def grammar_3 ():
 	UPT = pcfg.NT('UPT')
 	DOT = pcfg.NT('DOT')
 	STAY = pcfg.NT('STAY')
-	up = pcfg.T('up', [2.0], 0.1*np.identity(1))
-	stay = pcfg.T('stay', [0.0], 0.1*np.identity(1))
-	down = pcfg.T('down', [-2.0], 0.1*np.identity(1))
+	up = pcfg.T('up', [1.0], 0.2*np.identity(1))
+	stay = pcfg.T('stay', [0.0], 0.2*np.identity(1))
+	down = pcfg.T('down', [-1.0], 0.2*np.identity(1))
 	empty = pcfg.Empty(None)
 
 	r2[(S, S, S)] = 0.6
@@ -80,10 +80,31 @@ model = pcfg.BasePCFG(grammar=grammar_3(), start=pcfg.NT('S'))
 
 t, s = sample_data(model)
 print s.shape
+
 #t.draw()
-lik, t = model.decode(s)
+#lik, t = model.decode(s)
 #pprint( model.gamma )
 #print t
 #t.draw()
-from draw import draw
-draw(s, np.cumsum(s))
+data = t.pos()
+
+
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+fig = plt.figure()
+ax = fig.add_subplot(111)
+
+
+df = pd.DataFrame(data, columns=['value', 'state'])
+for n, g in df.groupby('state'):
+	if n.type() == "T":
+		print n
+		print g['value']
+		import pdb; pdb.set_trace()
+		ax.plot(g, "o-")
+ax.grid(True)
+plt.show()
+#import pdb; pdb.set_trace()
+#from draw import draw
+#draw(s, np.cumsum(s))
