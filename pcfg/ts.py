@@ -45,7 +45,6 @@ def grammar_3 ():
 	stay = pcfg.T('stay', [0.0], 0.2*np.identity(1))
 	down = pcfg.T('down', [-1.0], 0.2*np.identity(1))
 	empty = pcfg.Empty(None)
-
 	r2[(S, S, S)] = 0.6
 	r2[(S, UPT, DOT)] = 0.4
 	r2[(UPT, up, UPT, down)] = 0.7
@@ -55,6 +54,17 @@ def grammar_3 ():
 	r2[(STAY, STAY, stay)] = 0.8
 	r2[(STAY, empty)] = 0.2
 	return r2
+
+def grammar_4():
+    r = pcfg.Rule()
+    S = pcfg.NT('S')
+    a = pcfg.T('a', [1.0,1.0], 0.2*np.identity(2))
+    c = pcfg.T('c', [1.0,-1.0], 0.2*np.identity(2))
+    empty = pcfg.Empty(None)
+    r[(S, S, S)] = 0.1
+    r[(S, a, S, c)] = 0.8
+    r[(S, empty)] = 0.1
+    return r
 
 def data ():
 	seq = np.array([
@@ -76,35 +86,19 @@ def sample_data(model):
 	return tree, sample
 
 s = data ()
-model = pcfg.BasePCFG(grammar=grammar_3(), start=pcfg.NT('S'))
+model = pcfg.BasePCFG(grammar=grammar_4(), start=pcfg.NT('S'))
 
-t, s = sample_data(model)
-print s.shape
+tree, sample = model.sample()
+print sample
 
-#t.draw()
-#lik, t = model.decode(s)
+#tree.draw()
+lik, t = model.decode(sample)
 #pprint( model.gamma )
-#print t
+print lik
 #t.draw()
-data = t.pos()
 
-
-import matplotlib
-import matplotlib.pyplot as plt
-import pandas as pd
-fig = plt.figure()
-ax = fig.add_subplot(111)
-
-
-df = pd.DataFrame(data, columns=['value', 'state'])
-for n, g in df.groupby('state'):
-	if n.type() == "T":
-		print n
-		print g['value']
-		import pdb; pdb.set_trace()
-		ax.plot(g, "o-")
-ax.grid(True)
-plt.show()
+#ax.grid(True)
+#plt.show()
 #import pdb; pdb.set_trace()
-#from draw import draw
-#draw(s, np.cumsum(s))
+from draw import *
+draw2D(np.cumsum(sample, axis=0))
