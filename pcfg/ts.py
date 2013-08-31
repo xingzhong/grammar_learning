@@ -68,13 +68,12 @@ def grammar_4():
 
 def data ():
 	seq = np.array([
-		[1.0], 
-		[0.0], 
-		[-1.0],  
-		[1.0],
-		[0.0],
-		[0.0],
-		[-1.0],
+		[1.0, 1.0], 
+		[1.0, 0.0], 
+		[1.0, 0.0],
+		[1.0, 1.0],
+		[1.0, 0.0],
+		[1.0, 1.0],
 		])
 	noise = 0.2*np.random.randn(*seq.shape)
 	seq = seq + noise
@@ -91,14 +90,8 @@ model = pcfg.BasePCFG(grammar=grammar_4(), start=pcfg.NT('S'))
 tree, sample = model.sample()
 print sample
 
-#tree.draw()
-lik, t = model.decode(sample)
-#pprint( model.gamma )
-print lik
-#t.draw()
+lik, t, tag = model.decode(s)
 
-#ax.grid(True)
-#plt.show()
-#import pdb; pdb.set_trace()
-from draw import *
-draw2D(np.cumsum(sample, axis=0))
+print lik
+
+print model.score(s)
