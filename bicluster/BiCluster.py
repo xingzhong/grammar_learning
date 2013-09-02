@@ -35,29 +35,79 @@ def s2s(seqs):
             table[(x,y)] += 1
     return table, symbols
 
-def bestBC(table, symbols, ecm, ecmC):
+def bestBC2(table, symbols, ecm, ecmC):
     # looking for `best` biclustering among symbol-to-symbol table.
     # FIXME better optimization searching method required
     # Now brute-force for demo
     bestScore, best = -np.inf, None
+    _total = 2*2*len(symbols)*len(symbols)
+    _ind = 0
     for i in [1, 2]:
         for j in [1, 2]:
-            if i == 1 and j == 1:
-                continue
-            else:
-                for r in itertools.combinations(symbols,2):
-                    for c in itertools.combinations(symbols,1):
-                        bc = BiCluster()
-                        
-                        bc.loadTable(table, r, c)
-                        bc.loadEcm(ecm, ecmC)
-                        bc.build()
-                        temp = bc.logGain()
-                        
-                        if temp > bestScore:
-                            bestScore = temp
-                            best = bc
+            for r in itertools.combinations(symbols,i):
+                for c in itertools.combinations(symbols,j):
+                    _ind = _ind + 1
+                    if _ind%len(symbols):
+                        print "Searching one group %.4f"%(_ind/float(_total))
+                    bc = BiCluster()
+                    
+                    bc.loadTable(table, r, c)
+                    bc.loadEcm(ecm, ecmC)
+                    bc.build()
+                    temp = bc.logGain()
+                    
+                    if temp > bestScore:
+                        bestScore = temp
+                        best = bc
     return best
+
+def bestBC(table, symbols, ecm, ecmC):
+    if len(table) == 0:
+        return None
+    bestScore, best = -np.inf, None
+    ds = dict(table.most_common(30))
+    total = float(sum(ds.values()))
+    items = ds.keys()
+    probs = map(lambda x: float(x)/total, ds.values())
+    #import pdb ; pdb.set_trace()
+    candidates = []
+    for _ in range(5):
+        r, c = items[np.random.choice(len(items), p=probs)]
+        R = [r]
+        C = [c]
+        bc = BiCluster()
+        bc.loadTable(table, R, C)
+        bc.loadEcm(ecm, ecmC)
+        bc.build()
+        score = bc.logGain()
+        #print "select"
+        #print bc
+        if np.isinf(score):
+            print "inf"
+        else:    
+            delta = 1.0
+            while(delta > 0):
+                bc_new = bc
+                for new in np.random.permutation(list(symbols)):        
+                    bc_new_r = BiCluster().update(bc, table, ecm, row=new)        
+                    bc_new_c = BiCluster().update(bc, table, ecm, col=new)        
+                    if bc_new_c and bc_new_c.logGain() > bestScore:
+                        bc_new = bc_new_c 
+                        best = bc_new_c.logGain()
+                        break
+                    if bc_new_r and bc_new_r.logGain() > bestScore:
+                        bc_new = bc_new_r
+                        best = bc_new_r.logGain()
+                        break
+                delta = bc_new.logGain() - bc.logGain()
+                bc = bc_new
+            candidates.append( bc )
+    bestScore, best = -np.inf, None
+    for c in candidates:
+        if c and c.logGain() > bestScore:
+            best = c
+    return best
+
 
 def attach(bcs, n, t, ecm, g):
     new = Nonterminal(n)
@@ -73,8 +123,6 @@ def addProd(grammar, prod, nt):
         grammar = WeightedGrammar(Nonterminal("START"), prod)
 
     else:
-        print nt
-        #prods = filter(lambda x: not str(x.lhs()).startswith(str(nt)), grammar._productions)
         prods = []
         for p in grammar._productions:
             x = str(p.lhs())
@@ -131,7 +179,7 @@ class BiCluster():
             newc = np.zeros((m,1))
             for i,r in enumerate(newBc._rows):
                 newc[i,0] = table[(r, col)]
-                
+            
             newBc._table = np.hstack((newBc._table, newc))
             
             ecmRows = [i for i in itertools.product(newBc._rows, [col])]
@@ -205,7 +253,8 @@ class BiCluster():
         if DEBUG:
             s += "Expression Context Table:\n"
             s += self._showT(self._ecm, map(lambda x:" ".join(x), self.ecmRows), map(lambda x:"".join(x), self.ecmCols))
-        s += "LogGain:\t %s = %s + %s\n"%(self._logGain, self._logGain1, self._logGain2)
+        s += "LogGain:\t %.4f = %.4f + %.4f +%.4f\n"%(
+            self._logGain, self._logGain1, self._logGain2, self._logGain3)
         s += "Sum:\t\t %s\n"%self._sum
         if self._prods and DEBUG:
             s += "New Productions:\n"
@@ -241,8 +290,12 @@ class BiCluster():
             self._logGain1 = self._logM(self._table) 
         self._sum = np.sum(self._table)
         self._logGain2 = self._logM(self._ecm)
-
-        self._logGain = self._logGain1 + self._logGain2 + self._sum/4
+        A,B = self._table.shape
+        alpha = 0.1
+        self._logGain3 = alpha * ( 4*self._sum - 2*(A+B) - 8 )
+        
+        self._logGain = self._logGain1 + self._logGain2 + self._logGain3
+            
     
     @staticmethod
     def _logM(matrix):
@@ -271,6 +324,53 @@ class BiCluster():
                 print n
         return new
 
+def learnGrammar(sample):
+    sample2 = sample[:]
+    g = None
+    bcs = []
+    totalBits = sum(map(len, sample2))
+    print "total length %s \n"%totalBits
+    for i in range(30):
+        print "Compression :%.4f\n"%(sum(map(len, sample2))/float(totalBits))
+        table, symbols = s2s(sample2)
+        print "total symbols %s \n"%len(symbols)
+        ecm, cols, _ = buildEcm(sample2)
+        bc = bestBC(table, symbols, ecm, cols)
+        if not bc: 
+            print "no more rules!"
+            break
+        bcs.append(bc)
+        new = 'NT_%s'%i
+        sample2 = bc.reduction(sample2, new)
+        prods = bc.toRules(new)
+        g = addProd(g, prods, new)
+        print "new"
+        print bc
+        table, symbols = s2s(sample2)
+        ecm, cols, _ = buildEcm(sample2)
+
+        for ind, _bc in enumerate(bcs):
+            bc_new_c = BiCluster().update(_bc, table, ecm, col=Nonterminal(new))
+            bc_new_r = BiCluster().update(_bc, table, ecm, row=Nonterminal(new))
+            #print "bcG: %s"%bc_new.logGain()
+            best = None
+            if bc_new_c :
+                bc_new = bc_new_c 
+                best = bc_new_c.logGain()
+            if bc_new_r and bc_new_r.logGain() > best:
+                bc_new = bc_new_r
+                best = bc_new_r.logGain()
+            if best - bc.logGain() > 2.0:
+                print "Attach"
+                print bc_new
+                g = addProd(g, bc_new.toRules(), bc_new._nt)
+                sample2 = bc_new.reduction(sample2)
+                bcs[ind] = bc_new
+                
+    g = postProcess(g, sample2)
+    print "finish"
+    return g, sample2
+
 def main():
     import string
     sample = np.random.choice(list(string.lowercase[:4]), (50,10))
@@ -284,7 +384,7 @@ def main():
         table, symbols = s2s(sample2)
         ecm, cols, _ = buildEcm(sample2)
         bc = bestBC(table, symbols, ecm, cols)
-        if np.isneginf(bc.logGain()): 
+        if not bc: 
             print "no more !"
             break
         bcs.append(bc)
@@ -298,23 +398,23 @@ def main():
         for _bc in bcs:
             bc_new = BiCluster().update(_bc, table, ecm, col=Nonterminal(new))
             #print "bcG: %s"%bc_new.logGain()
-            if bc_new and bc_new.logGain() > 10.0:
+            if bc_new and bc_new.logGain() > 0.0:
                 print "Adding col %s to %s"%(new, bc_new._nt)
                 print bc_new
                 g = addProd(g, bc_new.toRules(), bc_new._nt)
                 sample2 = bc_new.reduction(sample2)
                 bcs.append(bc_new)
-                continue
+                #continue
             
             bc_new = BiCluster().update(_bc, table, ecm, row=Nonterminal(new))
             #print "bcG: %s"%bc_new.logGain()
-            if bc_new and bc_new.logGain() > 10.0:
+            if bc_new and bc_new.logGain() > 0.0:
                 print "Adding col %s to %s"%(new, bc_new._nt)
                 print bc_new
                 g = addProd(g, bc_new.toRules(), bc_new._nt)
                 sample2 = bc_new.reduction(sample2)
                 bcs.append(bc_new)
-                continue
+                #continue
             
     g = postProcess(g, sample2)
     print "finish"
