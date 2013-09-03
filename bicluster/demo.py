@@ -48,8 +48,8 @@ def learn(sample):
 
 def main():
     import string
-    sample = np.random.choice(list(string.lowercase[:6]), (50,20))
-    #sample = np.random.choice(["A", "T", "C", "G"], (100,10))
+    #sample = np.random.choice(list(string.lowercase[:6]), (50,20))
+    sample = np.random.choice(["A", "T", "C", "G"], (100,10), p=[0.1, 0.3, 0.5, 0.1])
     sample = np.asarray(sample, dtype= np.dtype("object") )
     g, sample2 = learn(sample)
     save(sample, sample2, g)
@@ -76,10 +76,10 @@ def parsing(sample, g):
 			#draw_trees(t)
 
 if __name__ == '__main__':
-    main()
-    sample, sample2, g = load()
-    print sample
-    print sample2
-    print g
-    #parsing(sample, g)
+	main()
+	sample, sample2, g = load()
+	#print sample
+	print sample2
+	print g
+	#parsing(sample, g)
     

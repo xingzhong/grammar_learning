@@ -61,6 +61,7 @@ def bestBC2(table, symbols, ecm, ecmC):
                         best = bc
     return best
 
+
 def bestBC(table, symbols, ecm, ecmC):
     if len(table) == 0:
         return None
@@ -73,15 +74,11 @@ def bestBC(table, symbols, ecm, ecmC):
     candidates = []
     for _ in range(5):
         r, c = items[np.random.choice(len(items), p=probs)]
-        R = [r]
-        C = [c]
         bc = BiCluster()
-        bc.loadTable(table, R, C)
+        bc.loadTable(table, [r], [c])
         bc.loadEcm(ecm, ecmC)
         bc.build()
         score = bc.logGain()
-        #print "select"
-        #print bc
         if np.isinf(score):
             print "inf"
         else:    
@@ -89,16 +86,17 @@ def bestBC(table, symbols, ecm, ecmC):
             while(delta > 0):
                 bc_new = bc
                 for new in np.random.permutation(list(symbols)):        
-                    bc_new_r = BiCluster().update(bc, table, ecm, row=new)        
+                          
                     bc_new_c = BiCluster().update(bc, table, ecm, col=new)        
                     if bc_new_c and bc_new_c.logGain() > bestScore:
                         bc_new = bc_new_c 
                         best = bc_new_c.logGain()
-                        break
+                        
+                    bc_new_r = BiCluster().update(bc, table, ecm, row=new)  
                     if bc_new_r and bc_new_r.logGain() > bestScore:
                         bc_new = bc_new_r
                         best = bc_new_r.logGain()
-                        break
+                        
                 delta = bc_new.logGain() - bc.logGain()
                 bc = bc_new
             candidates.append( bc )
@@ -167,6 +165,7 @@ class BiCluster():
         self._sum = 0.0
         self._nt = None
         self._prods = None
+        self.alpha = 0.2
     
     @staticmethod
     def update(bc, table, ecm, col=None, row=None):
@@ -291,8 +290,7 @@ class BiCluster():
         self._sum = np.sum(self._table)
         self._logGain2 = self._logM(self._ecm)
         A,B = self._table.shape
-        alpha = 0.1
-        self._logGain3 = alpha * ( 4*self._sum - 2*(A+B) - 8 )
+        self._logGain3 = self.alpha * ( 4*self._sum - 2*(A+B) - 8 )
         
         self._logGain = self._logGain1 + self._logGain2 + self._logGain3
             
