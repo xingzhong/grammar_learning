@@ -417,6 +417,37 @@ def main():
     g = postProcess(g, sample2)
     print "finish"
 
-if __name__ == '__main__':
-    main()
+
+def s2sM(seqs):
+    # generate symbol to symbol table 
+    # input: (m,n) sequence of symbols. 
+    #        m is the number of instance, 
+    #        n is the number of the symbols in each instance
+    # output: dict() key:tuple(x,y) value:occurrence 
+    table = Counter()
+    #symbols = reduce(lambda x,y: x.union(y), map(set, seqs), set())
+    symbols = set()
+    for seq in seqs:
+        for aid, s in enumerate(seq):
+            for x,y in zip(s, s[1:]):
+                if x and y:
+                    table[((x,aid), (y,aid), '<')] += 1
+                    symbols.add((x,aid))
+                    symbols.add((y,aid))
+        for s in seq.T:
+            for aid1, aid2 in itertools.combinations(range(len(s)), 2):
+                if s[aid1] and s[aid2]:
+                    table[((s[aid1],aid1), (s[aid2],aid2), '=')] += 1   
+    return table, symbols
+
+def multi():
+    import string
+    from pprint import pprint
+    sample = np.random.choice(list(string.lowercase[:4]), (50,3,10))
+    sample = np.asarray(sample, dtype= np.dtype("object") )
+    sample2 = sample.copy()
     
+    print s2sM(sample2)
+if __name__ == '__main__':
+    #main()
+    multi()
