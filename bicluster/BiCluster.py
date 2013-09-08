@@ -156,7 +156,7 @@ def _xlogx(x):
 xlogx = np.frompyfunc(_xlogx, 1, 1)
 
 class BiCluster():
-    def __init__(self, op='<'):
+    def __init__(self, op='<', alpha=0.2):
         self._rows = []
         self._cols = []
         self._logGain = 0.0
@@ -165,7 +165,7 @@ class BiCluster():
         self._sum = 0.0
         self._nt = None
         self._prods = None
-        self.alpha = 0.1
+        self.alpha = alpha
         self._op = op
     
     @staticmethod
@@ -323,10 +323,21 @@ class BiCluster():
         new = map( lambda x: self._replace(x, self._nt, self._rows, self._cols), sample )
         return new
 
-    def reductionM(self, sample, nonTerminal=None):
+    def reductionM(self, samples, nonTerminal=None):
         if nonTerminal :
             self._nt = Nonterminal(nonTerminal)
         # do reduction on matrix column-wise and row-wise
+        for i, sample in enumerate(samples):
+            import pdb; pdb.set_trace()
+            if self._op == '<':
+                new = map( lambda x: self._replace(x, self._nt, self._rows, self._cols), sample )
+                sample[i] = new[:]
+                
+            elif self._op == "=":
+                pass
+            
+        #return sample
+            
 
 def learnGrammar(sample):
     sample2 = sample[:]
@@ -434,17 +445,17 @@ def s2sM(seqs):
     #symbols = reduce(lambda x,y: x.union(y), map(set, seqs), set())
     symbols = set()
     for seq in seqs:
-        for aid, s in enumerate(seq):
+        for s in seq:
             for x,y in zip(s, s[1:]):
                 if x and y:
-                    table[((x,aid), (y,aid), '<')] += 1
-                    symbols.add((x,aid))
-                    symbols.add((y,aid))
+                    table[(x, y, '<')] += 1
+                    symbols.add(x)
+                    symbols.add(y)
                     #import pdb ; pdb.set_trace()
         for s in seq.T:
             for aid1, aid2 in itertools.combinations(range(len(s)), 2):
                 if s[aid1] and s[aid2]:
-                    table[((s[aid1],aid1), (s[aid2],aid2), '=')] += 1   
+                    table[(s[aid1], s[aid2], '=')] += 1   
 
     return table, symbols
 
@@ -457,23 +468,29 @@ def buildEcmM(seqs):
         for aid, s in enumerate(seq):
             for x,y,z in zip(s, s[1:], s[2:]):
                 if x and y and z:
-                    table[( ((x,aid), (y,aid)), (z,aid), '<')] += 1
-                    table[( ((y,aid), (z,aid)), (x,aid), '>')] += 1
-                    rows.add(((x,aid), (y,aid)))
-                    rows.add(((y,aid), (z,aid)))
-                    cols.add(((z,aid), '<'))
-                    cols.add(((x,aid), '>'))
+                    table[( (x, y), z, '<' )] += 1
+                    table[( (y, z), x, '>')] += 1
+                    rows.add((x, y))
+                    rows.add((y, z))
+                    cols.add((z, '<'))
+                    cols.add((x, '>'))
         for s in seq.T:
             for aid1, aid2, aid3 in itertools.combinations(range(len(s)), 3):
                 if s[aid1] and s[aid2] and s[aid3]:
-                    table[( ((s[aid1],aid1), (s[aid2],aid2)), (s[aid3],aid3), '=')] += 1
-                    table[( ((s[aid2],aid2), (s[aid3],aid3)), (s[aid1],aid1), '=')] += 1
-                    rows.add(((s[aid1],aid1), (s[aid2],aid2)))
-                    rows.add(((s[aid2],aid2), (s[aid3],aid3)))
-                    cols.add(((s[aid3],aid3), '='))
-                    cols.add(((s[aid1],aid1), '='))
+                    table[( (s[aid1], s[aid2]), s[aid3], '=')] += 1
+                    table[( (s[aid2], s[aid3]), s[aid1], '=')] += 1
+                    rows.add((s[aid1], s[aid2]))
+                    rows.add((s[aid2], s[aid3]))
+                    cols.add((s[aid3], '='))
+                    cols.add((s[aid1], '='))
                     
     return table, cols, rows
+
+def preProcess(sample):
+    for s in sample :
+        for ind, ss in enumerate(s):
+            ss[:] = map(lambda x: x and (x, ind), ss )
+    return sample
 
 def multi():
     import string
@@ -482,8 +499,8 @@ def multi():
     sample = np.asarray(sample, dtype= np.dtype("object") )
     sample2 = sample.copy()
     bcs = []
-    print sample2
     for i in range(1):
+        sample2 = preProcess(sample2)
         table, symbols = s2sM(sample2)
         ecm, cols, rows = buildEcmM(sample2)
         bc = DupbestBC(table, symbols, ecm, cols)
@@ -494,6 +511,7 @@ def multi():
         bcs.append(bc)
         new = 'NT_%s'%i
         sample2 = bc.reductionM(sample2, new)
+        print sample2
     
 
 def DupbestBC(table, symbols, ecm, ecmC):
