@@ -2,130 +2,290 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import itertools
+from collections import Counter
 
-def replace(G, old, new):
-	print "%s -> %s"%(old, new)
-	G.add_node(new, data=(-1, new))
-	for p,v in G[old].items():
-		G.add_edge(p, new, **v)
-	for p in G.neighbors(old):
-		G.remove_edge(p, old)
-	G.remove_node(old)
+class T(tuple):
+	def __repr__(self):
+		if self[0] == -1:
+			return self[1]
+		else:
+			return "%s_%s"%(self[0], self[1])
 
-def reduction(G, rows, cols, nt, op):
-	# given a graph data G,
-	# rows and cols are merge set
-	# nt is new non-terminal
-	# N1 = 1A 2A
-	if op == '=':
-		for (u,v,d) in G.edges(data=True):
-			if d['type'] == '=' and G.node.has_key(u) and G.node.has_key(v):
-				if G.node[u]['data'] in rows and G.node[v]['data'] in cols:
-					replace(G, u, nt )
-					replace(G, v, nt )
-				elif G.node[v]['data'] in rows and G.node[u]['data'] in cols:
-					replace(G, u, nt )
-					replace(G, v, nt )
-				
-	elif op == "<":
-		for (u,v,d) in G.edges(data=True):
-			if d['type'] == '<' :
-				if G.node[u]['data'] in rows and G.node[v]['data'] in cols:
-					replace(G, u, nt )
-					replace(G, v, nt )
+class rule():
+	def __init__(self, lhs, A, B, op):
+		self._lhs = lhs
+		self._op = op
+		self._A = set(A)
+		self._B = set(B)
 
-def main():
+	def __repr__(self):
+		A = " | ".join(map(str, self._A))
+		B = " | ".join(map(str, self._B))
+		return "%s %s ( %s ) ( %s )"%(self._lhs, self._op, A, B)
+
+class Graph():
+	# this is a data structure for multi-agent events
+
+	def __init__(self, sample ):
+		self._G = nx.DiGraph()
+		m, n = sample.shape
+		for i in range(m) :
+			for j in range(n) :
+				if sample[i][j]:
+					nodex = (i, j)
+					self._G.add_node(nodex, data=T((i, sample[i][j])), pos=nodex)
+					if j+1 < n:
+						nodey = (i, j+1)
+						if sample[i][j+1]:
+							self._G.add_node(nodey, data=T((i, sample[i][j+1])), pos=nodey)
+							self.add_edge_noloop(nodex, nodey, type='<')
+					for k in range(m):
+						nodey = (k, j)
+						if sample[k][j]:
+							self._G.add_node(nodey, data=T((k, sample[k][j])), pos=nodey)
+							self.add_edge_noloop(nodex, nodey, type='=')
+	
+	def add_edge_noloop(self, x, y, **attr):
+		# wrapper to prevent signle loop 
+		if x != y:
+			self._G.add_edge(x, y, **attr)
+
+	def reduction(self, R):
+		# nt [op] A B
+		A, B, nt, op = R._A, R._B, R._lhs, R._op
+		G = self._G
+		if op == '=':
+			for (u,v,d) in G.edges(data=True):
+
+				if d['type'] == '=' and G.node.has_key(u) and G.node.has_key(v):
+					if G.node[u]['data'] in A and G.node[v]['data'] in B:
+						self.merge(G, u, v, nt, '=')
+					elif G.node[v]['data'] in B and G.node[u]['data'] in A:
+						self.merge(G, v, u, nt, '=')
+					
+		elif op == "<":
+			for (u,v,d) in G.edges(data=True):
+				if d['type'] == '<' and G.node.has_key(u) and G.node.has_key(v):
+					if G.node[u]['data'] in A and G.node[v]['data'] in B:
+						self.merge(G, u, v, nt, '<')
+
+	@staticmethod
+	def merge2(G, A, B, new, op):
+		# merge two nodes A and B together to form new 
+		print "merge %s %s %s to %s"%(A, op, B, new)
+		G.add_node(new, data=T((-1, new)), pos=G.node[A]['pos'])
+		
+		if op == '=':
+			for (u,v,d) in G.in_edges([A, B], data=True):
+				if u != A and u != B:
+					G.add_edge(u, new, **d)
+			for (u,v,d) in G.out_edges([A, B], data=True):
+				if v != A and v != B :
+					G.add_edge(new, v, **d)
+
+		elif op == '<':
+			for (u,v,d) in G.in_edges([A], data=True):
+				if u != A and u != B:
+					G.add_edge(u, new, **d)
+			for (u,v,d) in G.out_edges([B], data=True):
+				if v != A and v != B and d['type'] != '=':
+					G.add_edge(new, v, **d)
+		
+		G.remove_nodes_from([A, B])
+
+	@staticmethod
+	def merge(G, A, B, new, op):
+		# merge two nodes A and B together to form new 
+		print "merge %s %s %s to %s"%(G.node[A]['data'], op, G.node[B]['data'], new)
+		
+		
+		if op == '=':
+			for (u,v,d) in G.in_edges([B], data=True):
+				if u != A and u != B:
+					G.add_edge(u, A, **d)
+			for (u,v,d) in G.out_edges([B], data=True):
+				if v != A and v != B :
+					G.add_edge(A, v, **d)
+
+		elif op == '<':
+			for (u,v,d) in G.in_edges([B], data=True):
+				if u != A and u != B and d['type'] != '=':
+					G.add_edge(u, A, **d)
+			for (u,v,d) in G.out_edges([B], data=True):
+				if v != A and v != B and d['type'] != '=':
+					G.add_edge(A, v, **d)
+
+		G.add_node(A, data=T((-1, new)))
+		G.remove_nodes_from([B])
+
+	@staticmethod
+	def _label(x):
+		if x[0] == -1:
+			return x[1]
+		else:
+			return "%s_%s"%(x[0], x[1])
+
+	@staticmethod
+	def _inverse(t):
+		if t == "<":
+			return '>'
+		elif t == ">":
+			return '<'
+		else:
+			return "="
+
+	def _showT(self, t, r, c):
+	    s =  "<\t"
+	    s += "\t".join(map(str, c))
+	    s += "\n"
+	    for x in r:
+	        s += "%s\t"%str(x)
+	        for y in c:
+	            s += "%s\t"%t[(x,y, '<')]
+	        s += "\n"
+	    s +=  "\n=\t"
+	    s += "\t".join(map(str, c))
+	    s += "\n"
+	    for x in r:
+	        s += "%s\t"%str(x)
+	        for y in c:
+	            s += "%s\t"%t[(x,y, '=')]
+	        s += "\n"
+	    return s
+
+	def s2s(self):
+		table = Counter()
+		symbols = set()
+		for (u,v,d) in self._G.edges_iter(data=True):
+			x = self._G.node[u]['data']
+			y = self._G.node[v]['data']
+			op = d['type']
+			table[(x, y, op)] += 1
+			symbols.add(x)
+			symbols.add(y)
+		return table, symbols
+
+	def ecm(self):
+		table = Counter()
+		rows = set()
+		cols = set()
+		for (n1, d) in self._G.nodes_iter(data=True):
+			ns = self._G.successors(n1)
+			ns.extend( self._G.predecessors(n1) )
+			ns = list( set(ns) )
+			nd1 = self._G.node[n1]['data']
+			for (n2,n3) in itertools.permutations(ns, 2):
+				d13 = self._G.get_edge_data(n1, n3)
+				d31 = self._G.get_edge_data(n3, n1)
+				nd2 = self._G.node[n2]['data']
+				nd3 = self._G.node[n3]['data']
+				if d13 :
+					table[(nd1, nd2), nd3, d13['type']] += 1
+					cols.add((n3, d13['type']))
+				else :
+					table[(nd1, nd2), nd3, self._inverse(d31['type'])] += 1
+					cols.add((n3, self._inverse(d31['type'])))
+				rows.add((n1, n2))
+		return table, rows, cols
+	
+
+
+
+	def vis(self, file="test.png", rule=None):
+		G = self._G
+		edge1=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "="]
+		edge2=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "<"]
+		edge_labels = { (u,v) : d['type'] for (u,v,d) in G.edges(data=True)  }
+		labels = {n:str(d['data']) for (n,d) in G.nodes(data=True)}
+		initPos = { n:d['pos'] for (n,d) in G.nodes(data=True)}
+		pos=nx.spring_layout(G, pos=initPos)
+		nx.draw_networkx_nodes(G,pos=initPos,node_size=300, alpha=0.8)
+		nx.draw_networkx_edges(G,pos=initPos,edgelist=edge1,
+	                    width=2, alpha=0.8, arrows=False)
+		nx.draw_networkx_edges(G,pos=initPos,edgelist=edge2,
+	                    width=2, alpha=0.8, edge_color='b',style='dashed', arrows=True)
+		nx.draw_networkx_labels(G,pos=initPos,labels=labels, font_size=8,font_family='sans-serif')
+		#nx.draw_networkx_edge_labels(G,pos,edge_labels=edge_labels, font_size=10,font_family='sans-serif')
+		plt.axis('on')
+		#plt.show()
+		if rule:
+			plt.title(str(rule))
+		plt.xlabel("agents")
+		plt.ylabel("time")
+		plt.savefig(file,dpi=300)
+		plt.clf()
+
+def multi():
 	sample = np.array(
 		[['A', 'C', 'E'], 
 		['A', 'D', 'D'],
 		['B', 'C', 'D']]
 		)
-	G = nx.Graph()
-	m, n = sample.shape
-	for i in range(m) :
-		for j in range(n) :
-			nodex = (i, j)
-			G.add_node(nodex, data=(i, sample[i][j]))
-			if j+1 < n:
-				nodey = (i, j+1)
-				G.add_node(nodey, data=(i, sample[i][j+1]))
-				G.add_edge(nodex, nodey, type='<')
-			for k in range(m):
-				nodey = (k, j)
-				G.add_node(nodey, data=(k, sample[k][j]))
-				G.add_edge(nodex, nodey, type='=')
-	#draw(G, sample)
-	cols = set()
-	cols.add((0, 'A'))
-	rows = set()
-	rows.add((1, 'A'))
-	reduction(G, cols, rows, 'NT1', '=')
-	draw(G, sample)
+	G = Graph(sample)
+	table, symbols = G.s2s()
+	ecm, rows, cols = G.ecm()
+	G.vis()
 
-	cols = set()
-	cols.add((0, 'C'))
-	rows = set()
-	rows.add((2, 'C'))
-	reduction(G, cols, rows, 'NT2', '=')
-	draw(G, sample)
+	r = rule("NT1", [T((0,'A'))], [T((1, 'A'))], '=')
+	G.reduction(r)
+	G.vis()
 
-	cols = set()
-	cols.add((1, 'D'))
-	rows = set()
-	rows.add((2, 'D'))
-	reduction(G, cols, rows, 'NT3', '=')
-	draw(G, sample)
+	r = rule("NT2", [T((0,'C'))], [T((2, 'C'))], '=')
+	G.reduction(r)
+	G.vis()
 
-	cols = set()
-	cols.add((-1, 'NT3'))
-	rows = set()
-	rows.add((1, 'D'))
-	reduction(G, cols, rows, 'NT4', '<')
-	draw(G, sample)
-
-	cols = set()
-	cols.add((-1, 'NT1'))
-	rows = set()
-	rows.add((2, 'B'))
-	reduction(G, cols, rows, 'NT5', '=')
-	draw(G, sample)
-
-	cols = set()
-	cols.add((-1, 'NT2'))
-	rows = set()
-	rows.add((-1, 'NT4'))
-	reduction(G, cols, rows, 'NT6', '=')
-	draw(G, sample)
-
-	cols = set()
-	cols.add((-1, 'NT6'))
-	rows = set()
-	rows.add((-1, 'NT5'))
-	reduction(G, cols, rows, 'NT7', '<')
-	draw(G, sample)
+	r = rule("NT3", [T((1,'D'))], [T((2, 'D'))], '=')
+	G.reduction(r)
+	G.vis()
 	
-	cols = set()
-	cols.add((0, 'E'))
-	rows = set()
-	rows.add((-1, 'NT7'))
-	reduction(G, cols, rows, 'S', '<')
-	draw(G, sample)
+	r = rule("NT4", [T((1,'D'))], [T((-1, 'NT3'))], '<')
+	G.reduction(r)
+	G.vis()
 
-def draw(G, S):
-	edge1=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "="]
-	edge2=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "<"]
-	edge_labels = { (u,v) : d['type'] for (u,v,d) in G.edges(data=True)  }
-	labels = {n:str(d['data']) for (n,d) in G.nodes(data=True)}
-	pos=nx.spring_layout(G)
-	nx.draw_networkx_nodes(G,pos,node_size=2000)
-	nx.draw_networkx_edges(G,pos,edgelist=edge1,
-                    width=6)
-	nx.draw_networkx_edges(G,pos,edgelist=edge2,
-                    width=6,alpha=0.5,edge_color='b',style='dashed')
-	nx.draw_networkx_labels(G,pos,labels=labels, font_size=10,font_family='sans-serif')
-	nx.draw_networkx_edge_labels(G,pos,edge_labels=edge_labels, font_size=10,font_family='sans-serif')
-	plt.axis('off')
-	plt.show()
-	#plt.savefig("test.png",dpi=75)
+	r = rule("NT5", [T((-1,'NT1'))], [T((2, 'B'))], '=')
+	G.reduction(r)
+	G.vis()
+
+	r = rule("NT6", [T((-1,'NT2'))], [T((-1, 'NT4'))], '=')
+	G.reduction(r)
+	G.vis()
+
+	r = rule("NT7", [T((-1,'NT5'))], [T((-1, 'NT6'))], '<')
+	G.reduction(r)
+	G.vis()
+
+	r = rule("S", [T((-1,'NT7'))], [T((0, 'E'))], '<')
+	G.reduction(r)
+
+	G.vis()
+
+def single():
+	sample = np.array(
+		[['A', 'B', 'A', 'C']]
+		)
+	G = Graph(sample)
+	G.vis()
+
+def big():
+	from BiCluster import DupbestBC
+
+	sample = np.random.choice(['A','T','C','G', None], (4,20))
+	print sample
+	G = Graph(sample)
+	G.vis(file='orig.png')
+	for i in range(30):
+		table, symbols = G.s2s()
+		ecm, rows, cols = G.ecm()
+		bc = DupbestBC(table, symbols, ecm, cols)
+		if not bc: 
+			print "no more rules!"
+			break
+		print bc
+		new = 'NT%s'%i
+		r = rule(new, bc._rows, bc._cols, bc._op)
+		print r
+		G.reduction(r)
+		G.vis(file='%s.png'%new, rule = r)
+
 if __name__ == '__main__':
-	main()
+	big()

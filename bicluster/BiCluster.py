@@ -156,7 +156,7 @@ def _xlogx(x):
 xlogx = np.frompyfunc(_xlogx, 1, 1)
 
 class BiCluster():
-    def __init__(self, op='<', alpha=0.2):
+    def __init__(self, op='<', alpha=0.05):
         self._rows = []
         self._cols = []
         self._logGain = 0.0
@@ -530,7 +530,6 @@ def DupbestBC(table, symbols, ecm, ecmC):
         bc.loadTable(table, [r], [c])
         bc.loadEcm(ecm, ecmC)
         bc.build()
-        print bc
         score = bc.logGain()
         if np.isinf(score):
             print "inf"
