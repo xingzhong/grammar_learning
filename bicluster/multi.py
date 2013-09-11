@@ -70,30 +70,6 @@ class Graph():
 						self.merge(G, u, v, nt, '<')
 
 	@staticmethod
-	def merge2(G, A, B, new, op):
-		# merge two nodes A and B together to form new 
-		print "merge %s %s %s to %s"%(A, op, B, new)
-		G.add_node(new, data=T((-1, new)), pos=G.node[A]['pos'])
-		
-		if op == '=':
-			for (u,v,d) in G.in_edges([A, B], data=True):
-				if u != A and u != B:
-					G.add_edge(u, new, **d)
-			for (u,v,d) in G.out_edges([A, B], data=True):
-				if v != A and v != B :
-					G.add_edge(new, v, **d)
-
-		elif op == '<':
-			for (u,v,d) in G.in_edges([A], data=True):
-				if u != A and u != B:
-					G.add_edge(u, new, **d)
-			for (u,v,d) in G.out_edges([B], data=True):
-				if v != A and v != B and d['type'] != '=':
-					G.add_edge(new, v, **d)
-		
-		G.remove_nodes_from([A, B])
-
-	@staticmethod
 	def merge(G, A, B, new, op):
 		# merge two nodes A and B together to form new 
 		print "merge %s %s %s to %s"%(G.node[A]['data'], op, G.node[B]['data'], new)
@@ -115,7 +91,7 @@ class Graph():
 				if v != A and v != B and d['type'] != '=':
 					G.add_edge(A, v, **d)
 
-		G.add_node(A, data=T((-1, new)))
+		G.add_node(A, data=new)
 		G.remove_nodes_from([B])
 
 	@staticmethod
@@ -207,12 +183,13 @@ class Graph():
 		nx.draw_networkx_labels(G,pos=initPos,labels=labels, font_size=8,font_family='sans-serif')
 		#nx.draw_networkx_edge_labels(G,pos,edge_labels=edge_labels, font_size=10,font_family='sans-serif')
 		plt.axis('on')
-		#plt.show()
+		
 		if rule:
 			plt.title(str(rule))
 		plt.xlabel("agents")
 		plt.ylabel("time")
-		plt.savefig(file,dpi=300)
+		#plt.savefig(file,dpi=300)
+		plt.show()
 		plt.clf()
 
 def multi():
@@ -267,25 +244,122 @@ def single():
 	G.vis()
 
 def big():
-	from BiCluster import DupbestBC
-
-	sample = np.random.choice(['A','T','C','G', None], (4,20))
-	print sample
-	G = Graph(sample)
-	G.vis(file='orig.png')
-	for i in range(30):
-		table, symbols = G.s2s()
-		ecm, rows, cols = G.ecm()
-		bc = DupbestBC(table, symbols, ecm, cols)
+	from BiCluster import DupbestBC, BiCluster
+	samples = np.random.choice(['A','T','C','G', None], (1, 4, 10))
+	Gs = map( Graph, samples)
+	bcs = []
+	totalBits = sum(map(lambda x : x._G.order(), Gs))
+	Gs[0].vis()
+	for i in range(10):
+		print "alpha:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
+		tables, symbols, ecms, cols = prepare(Gs)
+		bc = DupbestBC(tables, symbols, ecms, cols)
 		if not bc: 
 			print "no more rules!"
 			break
+		#import pdb; pdb.set_trace()
 		print bc
-		new = 'NT%s'%i
-		r = rule(new, bc._rows, bc._cols, bc._op)
+		bcs.append(bc)
+		new = T((-1, 'NT%s'%i))
+		bc._nt = new
+		r = rule(bc._nt, bc._rows, bc._cols, bc._op)
 		print r
-		G.reduction(r)
-		G.vis(file='%s.png'%new, rule = r)
+		for G in Gs:
+			G.reduction(r)
+
+		tables, symbols, ecms, cols = prepare(Gs)
+		for _bc in bcs:
+			
+			bc_new = BiCluster().update(_bc, tables, ecms, col=new)
+			#print "bcG: %s"%bc_new.logGain()
+			if bc_new and bc_new.logGain() > 0.0:
+				print "Adding col %s to %s"%(new, bc_new._nt)
+				print bc_new
+				#import pdb; pdb.set_trace()
+				r = rule(bc_new._nt, bc_new._rows, bc_new._cols, bc_new._op)
+				print r
+				for G in Gs:
+					G.reduction(r)
+				
+				bcs.append(bc_new)
+
+			bc_new = BiCluster().update(_bc, tables, ecms, row=new)
+			#print "bcG: %s"%bc_new.logGain()
+			if bc_new and bc_new.logGain() > 0.0:
+				print "Adding col %s to %s"%(new, bc_new._nt)
+				print bc_new
+				#import pdb; pdb.set_trace()
+				r = rule(bc_new._nt, bc_new._rows, bc_new._cols, bc_new._op)
+				print r
+				for G in Gs:
+					G.reduction(r)
+				bcs.append(bc_new)
+		Gs[0].vis(file='big_%s.png'%str(new), rule = r)
+
+def prepare(Gs):
+	tables = Counter()
+	symbols = set()
+	ecms = Counter()
+	cols = set()
+	for G in Gs:
+		table, symbol = G.s2s()
+		tables = tables + table
+		symbols = symbols | symbol
+		ecm, _, col = G.ecm()
+		ecms = ecms + ecm
+		cols = cols | col
+	return tables, symbols, ecms, cols
+
+def train():
+	from BiCluster import DupbestBC, BiCluster
+	samples = np.random.choice(['A','T','C','G', None], (3, 4,20))
+	Gs = map( Graph, samples)
+	bcs = []
+	totalBits = sum(map(lambda x : x._G.order(), Gs))
+	for i in range(10):
+		print "alpha:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
+		tables, symbols, ecms, cols = prepare(Gs)
+		bc = DupbestBC(tables, symbols, ecms, cols)
+		if not bc: 
+			print "no more rules!"
+			break
+		#import pdb; pdb.set_trace()
+		print bc
+		bcs.append(bc)
+		new = T((-1, 'NT%s'%i))
+		bc._nt = new
+		r = rule(bc._nt, bc._rows, bc._cols, bc._op)
+		print r
+		for G in Gs:
+			G.reduction(r)
+
+		tables, symbols, ecms, cols = prepare(Gs)
+		for _bc in bcs:
+			
+			bc_new = BiCluster().update(_bc, tables, ecms, col=new)
+			#print "bcG: %s"%bc_new.logGain()
+			if bc_new and bc_new.logGain() > 0.0:
+				print "Adding col %s to %s"%(new, bc_new._nt)
+				print bc_new
+				#import pdb; pdb.set_trace()
+				r = rule(bc_new._nt, bc_new._rows, bc_new._cols, bc_new._op)
+				print r
+				for G in Gs:
+					G.reduction(r)
+				
+				bcs.append(bc_new)
+
+			bc_new = BiCluster().update(_bc, tables, ecms, row=new)
+			#print "bcG: %s"%bc_new.logGain()
+			if bc_new and bc_new.logGain() > 0.0:
+				print "Adding col %s to %s"%(new, bc_new._nt)
+				print bc_new
+				#import pdb; pdb.set_trace()
+				r = rule(bc_new._nt, bc_new._rows, bc_new._cols, bc_new._op)
+				print r
+				for G in Gs:
+					G.reduction(r)
+				bcs.append(bc_new)
 
 if __name__ == '__main__':
 	big()
