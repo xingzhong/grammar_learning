@@ -114,6 +114,26 @@ def attach(bcs, n, t, ecm, g):
         if prod:
             g = addProd(g, [prod])
     return g
+
+def addProdM(grammar, prod, nt):
+    from multi import T
+    if not grammar:
+        grammar = WeightedGrammar(Nonterminal("START"), prod)
+    else:
+        prods = []
+        for p in grammar._productions:
+            x = str(p.lhs())
+            test = set([str(nt), "%s_A"%str(nt), "%s_B"%str(nt)])
+            if x in test:
+                continue
+            else:
+                prods.append(p)
+        prods.extend(prod)
+
+        grammar = WeightedGrammar(Nonterminal("START"), prods)
+    import pdb; pdb.set_trace()
+        
+    return grammar
             
 def addProd(grammar, prod, nt):
 
@@ -265,11 +285,9 @@ class BiCluster():
                 s += "%s\n"%p
         return s+'\n'
     
-    def toRules(self, nonTerminal=None):
-        if nonTerminal:
-            self._nt = Nonterminal(nonTerminal)
-        else:
-            nonTerminal = str(self._nt)
+    def toRules(self):
+
+        nonTerminal = str(self._nt)
             
         prods = []
         col = np.sum(self._table, axis=0)
@@ -357,7 +375,7 @@ def learnGrammar(sample):
         bcs.append(bc)
         new = 'NT_%s'%i
         sample2 = bc.reduction(sample2, new)
-        prods = bc.toRules(new)
+        prods = bc.toRules()
         g = addProd(g, prods, new)
         print "new"
         print bc

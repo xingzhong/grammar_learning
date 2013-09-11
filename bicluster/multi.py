@@ -12,16 +12,32 @@ class T(tuple):
 			return "%s_%s"%(self[0], self[1])
 
 class rule():
-	def __init__(self, lhs, A, B, op):
+	def __init__(self, lhs, A, B, op, PA={}, PB={}):
 		self._lhs = lhs
 		self._op = op
 		self._A = set(A)
 		self._B = set(B)
+		self._PA = PA
+		self._PB = PB
 
 	def __repr__(self):
-		A = " | ".join(map(str, self._A))
-		B = " | ".join(map(str, self._B))
+		#import pdb; pdb.set_trace()
+		A = " | ".join(map(lambda x: "%s [%.3f]"%(str(x[0]), x[1]), self._PA.items()))
+		B = " | ".join(map(lambda x: "%s [%.3f]"%(str(x[0]), x[1]), self._PB.items()))
 		return "%s %s ( %s ) ( %s )"%(self._lhs, self._op, A, B)
+
+	@staticmethod
+	def fromBC(bc):
+		col = np.sum(bc._table, axis=0)
+		row = np.sum(bc._table, axis=1)
+		PA, PB = {}, {}
+
+		for i, r in enumerate(bc._rows):
+			PA[r] = float(row[i]/bc._sum)
+		for i, c in enumerate(bc._cols):
+			PB[r] = float(col[i]/bc._sum)
+		
+		return rule(bc._nt, bc._rows, bc._cols, bc._op, PA, PB)
 
 class Graph():
 	# this is a data structure for multi-agent events
@@ -188,8 +204,8 @@ class Graph():
 			plt.title(str(rule))
 		plt.xlabel("agents")
 		plt.ylabel("time")
-		#plt.savefig(file,dpi=300)
-		plt.show()
+		plt.savefig(file,dpi=300)
+		#plt.show()
 		plt.clf()
 
 def multi():
@@ -243,14 +259,16 @@ def single():
 	G = Graph(sample)
 	G.vis()
 
+
 def big():
 	from BiCluster import DupbestBC, BiCluster
-	samples = np.random.choice(['A','T','C','G', None], (1, 4, 10))
+	samples = np.random.choice(['A','T','C','G', None], (1, 4, 6))
 	Gs = map( Graph, samples)
 	bcs = []
+	grammar = {}
 	totalBits = sum(map(lambda x : x._G.order(), Gs))
 	Gs[0].vis()
-	for i in range(10):
+	for i in range(50):
 		print "alpha:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
 		tables, symbols, ecms, cols = prepare(Gs)
 		bc = DupbestBC(tables, symbols, ecms, cols)
@@ -259,42 +277,40 @@ def big():
 			break
 		#import pdb; pdb.set_trace()
 		print bc
+
 		bcs.append(bc)
 		new = T((-1, 'NT%s'%i))
 		bc._nt = new
-		r = rule(bc._nt, bc._rows, bc._cols, bc._op)
+		r = rule.fromBC(bc)
 		print r
+		grammar[r._lhs] = r
 		for G in Gs:
 			G.reduction(r)
 
 		tables, symbols, ecms, cols = prepare(Gs)
-		for _bc in bcs:
-			
-			bc_new = BiCluster().update(_bc, tables, ecms, col=new)
+		for ind, _bc in enumerate(bcs):
+			bc_new_c = BiCluster().update(_bc, tables, ecms, col=bc._nt)
+			bc_new_r = BiCluster().update(_bc, tables, ecms, row=bc._nt)
 			#print "bcG: %s"%bc_new.logGain()
-			if bc_new and bc_new.logGain() > 0.0:
-				print "Adding col %s to %s"%(new, bc_new._nt)
+			best = None
+			if bc_new_c :
+				bc_new = bc_new_c 
+				best = bc_new_c.logGain()
+			if bc_new_r and bc_new_r.logGain() > best:
+				bc_new = bc_new_r
+				best = bc_new_r.logGain()
+			if best - bc.logGain() > 2.0:
+				print "Attach"
 				print bc_new
-				#import pdb; pdb.set_trace()
-				r = rule(bc_new._nt, bc_new._rows, bc_new._cols, bc_new._op)
+				r = rule.fromBC(bc_new)
 				print r
+				grammar[r._lhs] = r
 				for G in Gs:
 					G.reduction(r)
-				
-				bcs.append(bc_new)
-
-			bc_new = BiCluster().update(_bc, tables, ecms, row=new)
-			#print "bcG: %s"%bc_new.logGain()
-			if bc_new and bc_new.logGain() > 0.0:
-				print "Adding col %s to %s"%(new, bc_new._nt)
-				print bc_new
-				#import pdb; pdb.set_trace()
-				r = rule(bc_new._nt, bc_new._rows, bc_new._cols, bc_new._op)
-				print r
-				for G in Gs:
-					G.reduction(r)
-				bcs.append(bc_new)
+			bcs[ind] = bc_new
 		Gs[0].vis(file='big_%s.png'%str(new), rule = r)
+	for g in grammar.values():
+		print g
 
 def prepare(Gs):
 	tables = Counter()
