@@ -532,19 +532,21 @@ def multi():
         print sample2
     
 
-def DupbestBC(table, symbols, ecm, ecmC):
+def DupbestBC(table, symbols, ecm, ecmC, alpha=0.05, beta=5, cut=30):
+    # alpha : trade-off parameter 
+    # beta: 
     if len(table) == 0:
         return None
     bestScore, best = -np.inf, None
-    ds = dict(table.most_common(30))
+    ds = dict(table.most_common(cut))
     total = float(sum(ds.values()))
     items = ds.keys()
     probs = map(lambda x: float(x)/total, ds.values())
     #import pdb ; pdb.set_trace()
     candidates = []
-    for _ in range(1):
+    for _ in range(beta):
         r, c, op = items[np.random.choice(len(items), p=probs)]
-        bc = BiCluster(op)
+        bc = BiCluster(op, alpha=alpha)
         bc.loadTable(table, [r], [c])
         bc.loadEcm(ecm, ecmC)
         bc.build()

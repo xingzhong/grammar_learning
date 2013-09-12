@@ -35,8 +35,8 @@ class rule():
 		for i, r in enumerate(bc._rows):
 			PA[r] = float(row[i]/bc._sum)
 		for i, c in enumerate(bc._cols):
-			PB[r] = float(col[i]/bc._sum)
-		
+			PB[c] = float(col[i]/bc._sum)
+
 		return rule(bc._nt, bc._rows, bc._cols, bc._op, PA, PB)
 
 class Graph():
@@ -88,8 +88,7 @@ class Graph():
 	@staticmethod
 	def merge(G, A, B, new, op):
 		# merge two nodes A and B together to form new 
-		print "merge %s %s %s to %s"%(G.node[A]['data'], op, G.node[B]['data'], new)
-		
+		#print "merge %s %s %s to %s"%(G.node[A]['data'], op, G.node[B]['data'], new)
 		
 		if op == '=':
 			for (u,v,d) in G.in_edges([B], data=True):
@@ -259,6 +258,60 @@ def single():
 	G = Graph(sample)
 	G.vis()
 
+def learning(samples, alpha=0.05, ):
+	from BiCluster import DupbestBC, BiCluster
+	Gs = map( Graph, samples)
+	bcs = []
+	grammar = {}
+	totalBits = sum(map(lambda x : x._G.order(), Gs))
+	Gs[0].vis()
+	for i in range(50):
+		print "Compression:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
+		tables, symbols, ecms, cols = prepare(Gs)
+		bc = DupbestBC(tables, symbols, ecms, cols)
+		if not bc: 
+			print "no more rules!"
+			break
+		#import pdb; pdb.set_trace()
+		#print bc
+
+		bcs.append(bc)
+		new = T((-1, 'NT%s'%i))
+		bc._nt = new
+		r = rule.fromBC(bc)
+		grammar[r._lhs] = r
+		for G in Gs:
+			G.reduction(r)
+
+		tables, symbols, ecms, cols = prepare(Gs)
+		for ind, _bc in enumerate(bcs):
+			bc_new_c = BiCluster().update(_bc, tables, ecms, col=bc._nt)
+			bc_new_r = BiCluster().update(_bc, tables, ecms, row=bc._nt)
+			#print "bcG: %s"%bc_new.logGain()
+			best = None
+			if bc_new_c :
+				bc_new = bc_new_c 
+				best = bc_new_c.logGain()
+			if bc_new_r and bc_new_r.logGain() > best:
+				bc_new = bc_new_r
+				best = bc_new_r.logGain()
+			if best - bc.logGain() > 2.0:
+				print _bc
+				print "Attach"
+				print bc_new
+				r = rule.fromBC(bc_new)
+				print r
+				grammar[r._lhs] = r
+				for G in Gs:
+					G.reduction(r)
+			bcs[ind] = bc_new
+		#Gs[0].vis(file='big_%s.png'%str(new), rule = r)
+	return Gs, grammar
+def test1():
+	samples = np.random.choice(['A','T','C','G', None], (3, 4,20))
+	Gs, grammar = learning(samples)
+	for prod in grammar.values():
+		print prod
 
 def big():
 	from BiCluster import DupbestBC, BiCluster
@@ -378,4 +431,4 @@ def train():
 				bcs.append(bc_new)
 
 if __name__ == '__main__':
-	big()
+	test1()
