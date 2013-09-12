@@ -203,8 +203,8 @@ class Graph():
 			plt.title(str(rule))
 		plt.xlabel("agents")
 		plt.ylabel("time")
-		plt.savefig(file,dpi=300)
-		#plt.show()
+		#plt.savefig(file,dpi=300)
+		plt.show()
 		plt.clf()
 
 def multi():
@@ -273,7 +273,7 @@ def learning(samples, alpha=0.05, beta=5, cut=30):
 			print "no more rules!"
 			break
 		#import pdb; pdb.set_trace()
-		#print bc
+		print bc
 
 		bcs.append(bc)
 		new = T((-1, 'NT%s'%i))
@@ -296,17 +296,17 @@ def learning(samples, alpha=0.05, beta=5, cut=30):
 				bc_new = bc_new_r
 				best = bc_new_r.logGain()
 			if best - bc.logGain() > 2.0:
-				print _bc
-				print "Attach"
-				print bc_new
+				#print _bc
+				#print "Attach"
+				#print bc_new
 				r = rule.fromBC(bc_new)
-				print r
+				#print r
 				grammar[r._lhs] = r
 				for G in Gs:
 					G.reduction(r)
 			bcs[ind] = bc_new
 		#Gs[0].vis(file='big_%s.png'%str(new), rule = r)
-	return Gs, grammar
+	return Gs, grammar, bcs
 
 def test1():
 	samples = np.random.choice(['A','T','C','G', None], (3, 4,20))
