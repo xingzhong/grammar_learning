@@ -258,13 +258,13 @@ def single():
 	G = Graph(sample)
 	G.vis()
 
-def learning(samples, alpha=0.05, beta=5, cut=30):
+def learning(samples, alpha=0.05, beta=5, cut=30, gamma=2.0):
 	from BiCluster import DupbestBC, BiCluster
 	Gs = map( Graph, samples)
 	bcs = []
 	grammar = {}
 	totalBits = sum(map(lambda x : x._G.order(), Gs))
-	Gs[0].vis()
+	#Gs[0].vis()
 	for i in range(50):
 		print "Compression:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
 		tables, symbols, ecms, cols = prepare(Gs)
@@ -287,7 +287,7 @@ def learning(samples, alpha=0.05, beta=5, cut=30):
 		for ind, _bc in enumerate(bcs):
 			bc_new_c = BiCluster().update(_bc, tables, ecms, col=bc._nt)
 			bc_new_r = BiCluster().update(_bc, tables, ecms, row=bc._nt)
-			#print "bcG: %s"%bc_new.logGain()
+			
 			best = None
 			if bc_new_c :
 				bc_new = bc_new_c 
@@ -295,16 +295,12 @@ def learning(samples, alpha=0.05, beta=5, cut=30):
 			if bc_new_r and bc_new_r.logGain() > best:
 				bc_new = bc_new_r
 				best = bc_new_r.logGain()
-			if best - bc.logGain() > 2.0:
-				#print _bc
-				#print "Attach"
-				#print bc_new
+			if best - bc.logGain() > gamma:
 				r = rule.fromBC(bc_new)
-				#print r
 				grammar[r._lhs] = r
 				for G in Gs:
 					G.reduction(r)
-			bcs[ind] = bc_new
+				bcs[ind] = bc_new
 		#Gs[0].vis(file='big_%s.png'%str(new), rule = r)
 	return Gs, grammar, bcs
 
