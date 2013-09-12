@@ -307,11 +307,15 @@ def learning(samples, alpha=0.05, beta=5, cut=30):
 			bcs[ind] = bc_new
 		#Gs[0].vis(file='big_%s.png'%str(new), rule = r)
 	return Gs, grammar
+
 def test1():
 	samples = np.random.choice(['A','T','C','G', None], (3, 4,20))
 	Gs, grammar = learning(samples, alpha=0.05, beta=5, cut=30)
 	for prod in grammar.values():
 		print prod
+
+def test2():
+	pass
 
 def big():
 	from BiCluster import DupbestBC, BiCluster
