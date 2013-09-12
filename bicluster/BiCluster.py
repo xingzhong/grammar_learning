@@ -534,7 +534,8 @@ def multi():
 
 def DupbestBC(table, symbols, ecm, ecmC, alpha=0.05, beta=5, cut=30):
     # alpha : trade-off parameter 
-    # beta: 
+    # beta: number of random points
+    # cut: cut the symbols number
     if len(table) == 0:
         return None
     bestScore, best = -np.inf, None

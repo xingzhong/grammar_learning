@@ -258,7 +258,7 @@ def single():
 	G = Graph(sample)
 	G.vis()
 
-def learning(samples, alpha=0.05, ):
+def learning(samples, alpha=0.05, beta=5, cut=30):
 	from BiCluster import DupbestBC, BiCluster
 	Gs = map( Graph, samples)
 	bcs = []
@@ -268,7 +268,7 @@ def learning(samples, alpha=0.05, ):
 	for i in range(50):
 		print "Compression:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
 		tables, symbols, ecms, cols = prepare(Gs)
-		bc = DupbestBC(tables, symbols, ecms, cols)
+		bc = DupbestBC(tables, symbols, ecms, cols, alpha=0.05, beta=5, cut=30)
 		if not bc: 
 			print "no more rules!"
 			break
@@ -309,7 +309,7 @@ def learning(samples, alpha=0.05, ):
 	return Gs, grammar
 def test1():
 	samples = np.random.choice(['A','T','C','G', None], (3, 4,20))
-	Gs, grammar = learning(samples)
+	Gs, grammar = learning(samples, alpha=0.05, beta=5, cut=30)
 	for prod in grammar.values():
 		print prod
 
