@@ -258,17 +258,17 @@ def single():
 	G = Graph(sample)
 	G.vis()
 
-def learning(samples, alpha=0.05, beta=5, cut=30, gamma=2.0):
+def learning(samples, alpha=0.05, beta=5, cut=30, gamma=2.0, N=50):
 	from BiCluster import DupbestBC, BiCluster
 	Gs = map( Graph, samples)
 	bcs = []
 	grammar = {}
 	totalBits = sum(map(lambda x : x._G.order(), Gs))
 	#Gs[0].vis()
-	for i in range(50):
+	for i in range(N):
 		print "Compression:%s\n"%(sum(map(lambda x : x._G.order(), Gs))/float(totalBits))
 		tables, symbols, ecms, cols = prepare(Gs)
-		bc = DupbestBC(tables, symbols, ecms, cols, alpha=0.05, beta=5, cut=30)
+		bc = DupbestBC(tables, symbols, ecms, cols, alpha=alpha, beta=beta, cut=cut)
 		if not bc: 
 			print "no more rules!"
 			break
