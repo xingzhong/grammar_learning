@@ -273,7 +273,7 @@ def learning(samples, alpha=0.05, beta=5, cut=30, gamma=2.0):
 			print "no more rules!"
 			break
 		#import pdb; pdb.set_trace()
-		print bc
+		#print bc
 
 		bcs.append(bc)
 		new = T((-1, 'NT%s'%i))

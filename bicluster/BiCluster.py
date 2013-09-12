@@ -564,12 +564,12 @@ def DupbestBC(table, symbols, ecm, ecmC, alpha=0.05, beta=5, cut=30):
                     bc_new_c = BiCluster().update(bc, table, ecm, col=new)        
                     if bc_new_c and bc_new_c.logGain() > bestScore:
                         bc_new = bc_new_c 
-                        best = bc_new_c.logGain()
+                        bestScore = bc_new_c.logGain()
                         
                     bc_new_r = BiCluster().update(bc, table, ecm, row=new)  
                     if bc_new_r and bc_new_r.logGain() > bestScore:
                         bc_new = bc_new_r
-                        best = bc_new_r.logGain()
+                        bestScore = bc_new_r.logGain()
                         
                 delta = bc_new.logGain() - bc.logGain()
                 bc = bc_new
