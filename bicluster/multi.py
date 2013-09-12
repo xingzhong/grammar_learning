@@ -273,7 +273,7 @@ def learning(samples, alpha=0.05, beta=5, cut=30, gamma=2.0):
 			print "no more rules!"
 			break
 		#import pdb; pdb.set_trace()
-		#print bc
+		print bc
 
 		bcs.append(bc)
 		new = T((-1, 'NT%s'%i))
@@ -306,7 +306,7 @@ def learning(samples, alpha=0.05, beta=5, cut=30, gamma=2.0):
 
 def test1():
 	samples = np.random.choice(['A','T','C','G', None], (3, 4,20))
-	Gs, grammar = learning(samples, alpha=0.05, beta=5, cut=30)
+	Gs, grammar, bcs = learning(samples, alpha=0.05, beta=25, cut=30)
 	for prod in grammar.values():
 		print prod
 

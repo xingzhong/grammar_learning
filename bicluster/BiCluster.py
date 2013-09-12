@@ -552,6 +552,7 @@ def DupbestBC(table, symbols, ecm, ecmC, alpha=0.05, beta=5, cut=30):
         bc.loadEcm(ecm, ecmC)
         bc.build()
         score = bc.logGain()
+        #import pdb ; pdb.set_trace()
         if np.isinf(score):
             print "inf"
         else:
@@ -561,12 +562,12 @@ def DupbestBC(table, symbols, ecm, ecmC, alpha=0.05, beta=5, cut=30):
                 bc_new = bc
                 for newIdx in np.random.permutation(len(symbolsList)):
                     new = symbolsList[newIdx]            
-                    bc_new_c = BiCluster().update(bc, table, ecm, col=new)        
+                    bc_new_c = BiCluster().update(bc_new, table, ecm, col=new)        
                     if bc_new_c and bc_new_c.logGain() > bestScore:
                         bc_new = bc_new_c 
                         bestScore = bc_new_c.logGain()
                         
-                    bc_new_r = BiCluster().update(bc, table, ecm, row=new)  
+                    bc_new_r = BiCluster().update(bc_new, table, ecm, row=new)  
                     if bc_new_r and bc_new_r.logGain() > bestScore:
                         bc_new = bc_new_r
                         bestScore = bc_new_r.logGain()
@@ -575,9 +576,12 @@ def DupbestBC(table, symbols, ecm, ecmC, alpha=0.05, beta=5, cut=30):
                 bc = bc_new
             candidates.append( bc )
     bestScore, best = -np.inf, None
+
     for c in candidates:
         if c and c.logGain() > bestScore:
             best = c
+            bestScore = c.logGain()
+    
     return best
 
 if __name__ == '__main__':
