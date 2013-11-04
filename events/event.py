@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pprint import pprint 
 from scipy.sparse.linalg import eigs
+from scipy.stats import norm
 
 
 class Grammar():
@@ -155,7 +156,7 @@ def learning(graph, grammar):
 def formartSemantic(x):
     return "\n".join(map( lambda x:"%.2f"%x, x.flat))
 
-def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=True, weight='delta'):
+def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=True, weight='delta', output=False):
     plt.figure(figsize=figsize)
     edge1=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "="]
     edge2=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "<"]
@@ -163,7 +164,7 @@ def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=Tru
     edge_labels = { (u,v) : "%.2f"%d[weight] for (u,v,d) in G.edges(data=True) }
     #pprint (edge_labels)
     #labels = {n:str(d) for (n,d) in G.nodes(data=True)}
-    initPos = { n:(n._tp , np.mean( map(float, n._aids ) ) + np.random.normal(0, 0.01) ) 
+    initPos = { n:(n._tp , np.mean( map(float, n._aids ) )  ) 
         for (n,d) in G.nodes(data=True)}
     pos=nx.spring_layout(G, pos=initPos)
     
@@ -171,7 +172,7 @@ def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=Tru
     labels = { n : formartSemantic(n._semantics) for n in G.nodes() }
     #nx.draw_networkx_nodes(G,pos=initPos,nodelist=node1, node_size=node_size, alpha=0.8, node_color='green')
     if cluster:
-        colors = [d['cluster'] for (n,d) in G.nodes(data=True)]
+        colors = [d.get('cluster', 'white') for (n,d) in G.nodes(data=True)]
     else:
         colors = 'white'
     nx.draw_networkx_nodes(G,pos=initPos, node_size=node_size, alpha=0.8, node_color=colors, cmap=plt.get_cmap('Accent'))
@@ -183,14 +184,17 @@ def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=Tru
         #nx.draw_networkx_edges(G,pos=initPos,edgelist=edge3,
         #                width=1, alpha=0.8, edge_color='r', arrows=True)
     if label:
-        nx.draw_networkx_labels(G,pos=initPos, labels = labels, font_size=8,font_family='sans-serif',label_pos=0.8)
+        nx.draw_networkx_labels(G,pos=initPos, labels = labels, font_size=12,font_family='sans-serif',label_pos=0.8)
         nx.draw_networkx_edge_labels(G, pos=initPos, edge_labels=edge_labels, font_size=10,font_family='sans-serif', alpha=0.5)
     plt.axis('on')
     plt.grid()
     plt.xlabel("Time Grid")
     plt.ylabel("Agents")
-    plt.show()
-    #plt.savefig("test.eps", dpi=1000)
+    
+    if output:
+        plt.savefig("test.eps", dpi=1000)
+    else:
+        plt.show()
                 
 def drawG(G, node_size=800, figsize=(18,8)):
     plt.figure(figsize=figsize)
@@ -216,8 +220,8 @@ def drawG(G, node_size=800, figsize=(18,8)):
     plt.grid()
     plt.xlabel("Time Grid")
     plt.ylabel("Agents")
-    #plt.show()
-    plt.savefig("test.eps", dpi=1000)
+    plt.show()
+    #plt.savefig("test.eps", dpi=1000)
 
 class EventGraph(nx.DiGraph):
     def clustering(self, weight='delta', k=10):
