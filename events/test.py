@@ -68,17 +68,18 @@ def toProd(graph, gamma=-4, k=10):
 def rewrite(graph, means, covars, gamma=-4):
 	edges = []
 	B = set()
-	C = set()
+	C = set()	
 	for (x,y,d) in graph.edges(data=True):
 		if d['delta'] > gamma:
 			edges.append( (x, y) )
+			nt = Event(-1, x._aids | y._aids, np.array([means, covars]))
+			graph._merge(x, y, nt, d)
 			B.add(x)
 			C.add(y)
-	nx.set_node_attributes(graph, "cluster", dict(zip(B, ["blue"]*len(B))))
-	nx.set_node_attributes(graph, "cluster", dict(zip(C, ["red"]*len(C))))
+	#nx.set_node_attributes(graph, "cluster", dict(zip(B, ["blue"]*len(B))))
+	#nx.set_node_attributes(graph, "cluster", dict(zip(C, ["red"]*len(C))))
 	print means
 	print covars
-	drawG2(graph, cluster=True, label=True)
 
 
 if __name__ == '__main__':
@@ -95,5 +96,8 @@ if __name__ == '__main__':
 			if not atom is None:
 				g.addEvent( Event(t, aid, atom.rvs()))
 	g.buildEdges(delta = 1)
-	means, covars = toProd(g)
-	rewrite(g, means, covars)
+
+	for i in range (2) :
+		drawG2(g, cluster=True, label=True, output="test_%s"%i)
+		means, covars = toProd(g)
+		rewrite(g, means, covars)

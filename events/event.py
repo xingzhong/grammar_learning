@@ -192,7 +192,7 @@ def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=Tru
     plt.ylabel("Agents")
     
     if output:
-        plt.savefig("test.eps", dpi=1000)
+        plt.savefig("%s.eps"%output, dpi=1000)
     else:
         plt.show()
                 
