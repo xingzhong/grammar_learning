@@ -1,9 +1,21 @@
 from event import *
+try :
+	np.random.choice(5)
+	from numpy.random import choice as choice
+except :
+	print "using own choice"
+	def choice(x, size=1, p=None) :
+		idx = np.random.randint(0, high=len(x), size=size)
+		choose = np.frompyfunc( lambda y: x[y], 1, 1 )
+		return choose(idx)
 
 def semanticMatrix(g):
 	S = []
 	for (x,y,d) in g.edges(data=True):
 		S.append(np.hstack((x._semantics, y._semantics)))
+		#print x._semantics
+		#print y._semantics
+		#print np.hstack((x._semantics, y._semantics))
 	return np.array(S)
 
 def vis2D(m, ax, means=None):
@@ -72,7 +84,7 @@ def rewrite(graph, means, covars, gamma=-4):
 	for (x,y,d) in graph.edges(data=True):
 		if d['delta'] > gamma:
 			edges.append( (x, y) )
-			nt = Event(-1, x._aids | y._aids, np.array([means, covars]))
+			nt = Event(-1, x._aids | y._aids, np.mean(means))
 			graph._merge(x, y, nt, d)
 			B.add(x)
 			C.add(y)
@@ -88,7 +100,7 @@ if __name__ == '__main__':
 	right = norm(loc=np.array([-4.0]))
 	stop = norm(loc=np.array([0.0]))
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = np.random.choice([left, right, stop, None], size=(6,10), p=[0.4,0.25,0.25,0.1])
+	sample = choice([left, right, stop, None], size=(6,10), p=[0.4,0.25,0.25,0.1])
 	rvs = np.frompyfunc(lambda x:x.rvs() if x else None, 1, 1)
 	samples = rvs(sample)
 	for aid, seq in enumerate (sample):
@@ -97,7 +109,7 @@ if __name__ == '__main__':
 				g.addEvent( Event(t, aid, atom.rvs()))
 	g.buildEdges(delta = 1)
 
-	for i in range (2) :
+	for i in range (4) :
 		drawG2(g, cluster=True, label=True, output="test_%s"%i)
 		means, covars = toProd(g)
 		rewrite(g, means, covars)
