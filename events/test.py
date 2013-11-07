@@ -91,25 +91,26 @@ def rewrite(graph, means, covars, gamma=-4):
 
 if __name__ == '__main__':
 	g = EventGraph()
-	left = norm(loc=np.array([5.0]))
-	right = norm(loc=np.array([-10.0]))
-	stop = norm(loc=np.array([0.0]))
+	left = norm(loc=np.array([5.0]), scale=0.01)
+	right = norm(loc=np.array([-5.0]), scale=0.01)
+	stop = norm(loc=np.array([0.0]), scale=0.01)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = choice([left, right, stop, None], size=(3,4), p=[0.4,0.25,0.25,0.1])
+	sample = choice([left, right, stop, None], size=(5,9), p=[0.4,0.25,0.25,0.1])
 	rvs = np.frompyfunc(lambda x:x.rvs() if x else None, 1, 1)
 	samples = rvs(sample)
+
 	for aid, seq in enumerate (sample):
 		for t, atom in enumerate (seq):
 			if not atom is None:
-				g.addEvent( Event(t, aid, atom.rvs()))
+				g.addEvent( Event(t, aid, atom.rvs() ))
+
 	g.buildEdges(delta = 1)
 
-	for i in range (6) :
+	for i in range (20) :
 		if len(g.nodes()) < 3 :
 			break
 		means, covars = toProd(g)
 		drawG2(g, node_size=1400, cluster=False, label=True, output="test_%s"%i, 
-			title="NT -> \n \t %s \n \t %s"%(means.reshape(2, len(means)/2), covars.reshape(2, len(covars)/2)))
-		print "NT -> \n \t %s \n \t %s"%(means.reshape(2, len(means)/2), covars.reshape(2, len(covars)/2))
-
+			title="%s"%(means.reshape(2, len(means)/2)))
+		
 		rewrite(g, means, covars, gamma=-5)

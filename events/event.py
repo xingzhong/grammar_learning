@@ -186,7 +186,7 @@ def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=Tru
     if label:
         nx.draw_networkx_labels(G,pos=initPos, labels = labels, font_size=12,font_family='sans-serif',label_pos=0.8)
         nx.draw_networkx_edge_labels(G, pos=initPos, edge_labels=edge_labels, font_size=10,font_family='sans-serif', alpha=0.5)
-    plt.axis('on')
+    #plt.axis('on')
     plt.grid()
     plt.xlabel("Time Grid")
     plt.ylabel("Agents")
