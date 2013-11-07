@@ -40,7 +40,6 @@ def make_ellipses(gmm, ax, idx):
 	import matplotlib as mpl
 	from matplotlib import cm
 	k = gmm.get_params()['n_components']
-	
 	for n in range(k):
 		if (idx is None) or n==idx:
 			color = cm.jet(1.*n/k)
@@ -62,45 +61,41 @@ def vis(sm, cluster, k=None):
 	make_ellipses(cluster, ax, k)
 	vis2D(sm, ax, means=cluster.means_)
 
-def bestProd(sm, cluster, gamma=-4):
-	logProds = log_multivariate_normal_density(sm, cluster.means_, cluster.covars_)
-	idx = np.argmax( np.sum(logProds > gamma, axis=0) )
-	coverage = np.sum(logProds > gamma, axis=0)
-	print coverage
-	print idx
-	return idx, logProds[:, idx]
+def bestProd(sm, cluster):
+	idx = np.argmax(cluster.weights_)
+	logProds = log_multivariate_normal_density(sm, np.array([cluster.means_[idx]]), np.array([cluster.covars_[idx]]))
+	return idx, logProds
 
 def toProd(graph, gamma=-4, k=10):
 	sm = semanticMatrix(g)
-	cluster = gmm(sm, k=k)
-	idx, logProd = bestProd(sm, cluster, gamma=gamma)
+	n = sm.shape
+	print n, k
+	cluster = gmm(sm, k=min(k, n[0]))
+	idx, logProd = bestProd(sm, cluster)
 	nx.set_edge_attributes(graph, "delta", dict(zip(graph.edges(), logProd)))
+	print cluster.means_[idx], cluster.covars_[idx]
 	return cluster.means_[idx], cluster.covars_[idx]
 
 def rewrite(graph, means, covars, gamma=-4):
-	edges = []
-	B = set()
-	C = set()	
-	for (x,y,d) in graph.edges(data=True):
-		if d['delta'] > gamma:
-			edges.append( (x, y) )
-			nt = Event(-1, x._aids | y._aids, np.mean(means))
-			graph._merge(x, y, nt, d)
-			B.add(x)
-			C.add(y)
-	#nx.set_node_attributes(graph, "cluster", dict(zip(B, ["blue"]*len(B))))
-	#nx.set_node_attributes(graph, "cluster", dict(zip(C, ["red"]*len(C))))
-	print means
-	print covars
+	edges = filter(lambda x: x[2]['delta'] > gamma, graph.edges(data=True))
+	if len(edges) > 0:
+		for (x,y,d) in sorted(edges, key=lambda x:x[2]['delta'], reverse=True) :
+			if graph.has_node(x) and graph.has_node(y) :
+				semantics = np.mean( means.reshape((2, len(means)/2)), axis=0 )
+				nt = Event(-1, x._aids | y._aids, semantics)
+				graph._merge(x, y, nt, d)
+		rewrite(graph, means, covars, gamma=gamma)
+
+	
 
 
 if __name__ == '__main__':
 	g = EventGraph()
-	left = norm(loc=np.array([4.0]))
-	right = norm(loc=np.array([-4.0]))
+	left = norm(loc=np.array([5.0]))
+	right = norm(loc=np.array([-10.0]))
 	stop = norm(loc=np.array([0.0]))
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = choice([left, right, stop, None], size=(6,10), p=[0.4,0.25,0.25,0.1])
+	sample = choice([left, right, stop, None], size=(3,4), p=[0.4,0.25,0.25,0.1])
 	rvs = np.frompyfunc(lambda x:x.rvs() if x else None, 1, 1)
 	samples = rvs(sample)
 	for aid, seq in enumerate (sample):
@@ -109,7 +104,12 @@ if __name__ == '__main__':
 				g.addEvent( Event(t, aid, atom.rvs()))
 	g.buildEdges(delta = 1)
 
-	for i in range (4) :
-		drawG2(g, cluster=True, label=True, output="test_%s"%i)
+	for i in range (6) :
+		if len(g.nodes()) < 3 :
+			break
 		means, covars = toProd(g)
-		rewrite(g, means, covars)
+		drawG2(g, node_size=1400, cluster=False, label=True, output="test_%s"%i, 
+			title="NT -> \n \t %s \n \t %s"%(means.reshape(2, len(means)/2), covars.reshape(2, len(covars)/2)))
+		print "NT -> \n \t %s \n \t %s"%(means.reshape(2, len(means)/2), covars.reshape(2, len(covars)/2))
+
+		rewrite(g, means, covars, gamma=-5)

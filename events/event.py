@@ -156,7 +156,7 @@ def learning(graph, grammar):
 def formartSemantic(x):
     return "\n".join(map( lambda x:"%.2f"%x, x.flat))
 
-def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=True, weight='delta', output=False):
+def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=True, weight='delta', output=False, title=None):
     plt.figure(figsize=figsize)
     edge1=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "="]
     edge2=[(u,v) for (u,v,d) in G.edges(data=True) if d['type'] == "<"]
@@ -190,9 +190,11 @@ def drawG2(G, node_size=800, figsize=(18,8) , label=True ,edge=True, cluster=Tru
     plt.grid()
     plt.xlabel("Time Grid")
     plt.ylabel("Agents")
+    if title :
+        plt.title(title)
     
     if output:
-        plt.savefig("%s.png"%output, dpi=1000)
+        plt.savefig("%s.eps"%output, dpi=1000)
     else:
         plt.show()
                 
