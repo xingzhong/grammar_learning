@@ -1,4 +1,5 @@
 from event import *
+from kinetic import kinetic
 try :
 	np.random.choice(5)
 	from numpy.random import choice as choice
@@ -50,12 +51,17 @@ def make_ellipses(model, ax, idx):
 	for n in range(k):
 		if (idx is None) or n==idx:
 			color = cm.jet(1.*n/k)
-			v, w = np.linalg.eigh(model._get_covars()[n][:2, :2])
+			
+			v, w = np.linalg.eigh(model._get_covars()[n][[[2],[5]], [2,5]])
+			#v, w = np.linalg.eigh(model._get_covars()[n][:2, :2])
+
 			u = w[0] / np.linalg.norm(w[0])
 			angle = np.arctan2(u[1], u[0])
 			angle = 180 * angle / np.pi  # convert to degrees
 			v *= 9
-			ell = mpl.patches.Ellipse(model.means_[n, :2], v[0], v[1],
+			#ell = mpl.patches.Ellipse(model.means_[n, :2], v[0], v[1],
+			#	180 + angle, color=color)
+			ell = mpl.patches.Ellipse(model.means_[n, [2,5]], v[0], v[1],
 				180 + angle, color=color)
 			ell.set_clip_box(ax.bbox)
 			ell.set_alpha(0.5)
@@ -66,7 +72,7 @@ def vis(sm, cluster, k=None):
 	fig.subplots_adjust(left=0.02, right=0.98, bottom=0.05, top=0.9)
 	ax = fig.add_subplot(1, 1, 1)
 	make_ellipses(cluster, ax, k)
-	vis2D(sm, ax, means=cluster.means_)
+	vis2D(sm, ax)
 
 def bestProd(sm, cluster):
 	idx = np.argmax(cluster.weights_)
@@ -80,8 +86,14 @@ def toProd(graph, gamma=-4, k=10):
 	cluster = gmm(sm, k=min(k, n[0]))
 	idx, logProd = bestProd(sm, cluster)
 	nx.set_edge_attributes(graph, "delta", dict(zip(graph.edges(), logProd)))
+	edges = filter(lambda x: x[2]['delta'] > gamma, graph.edges(data=True))
+	c = {}
+	for edge in edges :
+		c[edge[0]] = 'pink'
+		c[edge[1]] = 'pink'
+	nx.set_node_attributes(graph, 'cluster', c)
 	print cluster.means_[idx], cluster.covars_[idx]
-	#vis(sm, cluster, k=None)
+	#vis(sm[:,[2,5]], cluster, k=None)
 	return cluster.means_[idx], cluster.covars_[idx]
 
 def rewrite(graph, means, covars, gamma=-4):
@@ -89,36 +101,37 @@ def rewrite(graph, means, covars, gamma=-4):
 	if len(edges) > 0:
 		for (x,y,d) in sorted(edges, key=lambda x:x[2]['delta'], reverse=True) :
 			if graph.has_node(x) and graph.has_node(y) :
-				semantics = np.mean( means.reshape((2, len(means)/2)), axis=0 )
 				nt = Event(-1, x._aids | y._aids, means)
 				graph._merge(x, y, nt, d)
 				rewrite(graph, means, covars, gamma=gamma)
 
 	
 
-
-if __name__ == '__main__':
+def sample():
 	g = EventGraph()
 	left = norm(loc=np.array([5.0]), scale=0.5)
 	right = norm(loc=np.array([-5.0]), scale=0.5)
-	stop = norm(loc=np.array([0.0]), scale=0.5)
+	jump = norm(loc=np.array([20.0]), scale=0.5)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = choice([left, right, stop, None], size=(5,9), p=[0.4,0.25,0.25,0.1])
+	sample = choice([left, right, jump, None], size=(5,9), p=[0.4,0.3,0.2,0.1])
 	rvs = np.frompyfunc(lambda x:x.rvs() if x else None, 1, 1)
 	samples = rvs(sample)
-
 	for aid, seq in enumerate (sample):
 		for t, atom in enumerate (seq):
 			if not atom is None:
 				g.addEvent( Event(t, aid, atom.rvs() ))
-
 	g.buildEdges(delta = 1)
+	return g
 
+if __name__ == '__main__':
+	
+	g = kinetic(M=0, N=10)
+	#g = kinetic()
 	for i in range (5) :
-		if len(g.nodes()) < 3 :
+		if len(g.nodes()) < 2 :
 			break
-		means, covars = toProd(g)
-		#drawG2(g, node_size=1400, cluster=False, label=True, output="test_%s"%i, 
-		#		title="%s"%(means.reshape(2, len(means)/2)))
+		means, covars = toProd(g, k=20, gamma=-3)
+		drawG2(g, node_size=2000, cluster=True, label=True, output="test_%s"%i, 
+				title="%s"%(means))
 		
-		rewrite(g, means, covars, gamma=-5)
+		rewrite(g, means, covars, gamma=-3)
