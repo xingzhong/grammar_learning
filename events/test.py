@@ -24,6 +24,8 @@ def semanticMatrix(g):
         right[i] = np.append(r, [0]*(n-r.shape[0]))
     left = np.array(left)
     right = np.array(right)
+    #print left
+    #print right
     return np.hstack((left, right))
 
 def vis2D(m, ax, means=None):
@@ -83,6 +85,7 @@ def toProd(graph, gamma=-4, k=10):
 	sm = semanticMatrix(g)
 	n = sm.shape
 	print n, k
+	print sm
 	cluster = gmm(sm, k=min(k, n[0]))
 	idx, logProd = bestProd(sm, cluster)
 	nx.set_edge_attributes(graph, "delta", dict(zip(graph.edges(), logProd)))
@@ -92,7 +95,7 @@ def toProd(graph, gamma=-4, k=10):
 		c[edge[0]] = 'pink'
 		c[edge[1]] = 'pink'
 	nx.set_node_attributes(graph, 'cluster', c)
-	print cluster.means_[idx], cluster.covars_[idx]
+	
 	#vis(sm[:,[2,5]], cluster, k=None)
 	return cluster.means_[idx], cluster.covars_[idx]
 
@@ -101,21 +104,26 @@ def rewrite(graph, means, covars, gamma=-4):
 	if len(edges) > 0:
 		for (x,y,d) in sorted(edges, key=lambda x:x[2]['delta'], reverse=True) :
 			if graph.has_node(x) and graph.has_node(y) :
-				nt = Event(-1, x._aids | y._aids, means)
+				nt = Event(-1, x._aids | y._aids, cutDim( means))
 				graph._merge(x, y, nt, d)
 				rewrite(graph, means, covars, gamma=gamma)
 
+def cutDim(x) :
+	print 'old', x
+	xx = x.reshape(2, len(x)/2)
+	xx = xx[:, np.any(xx, axis=0)].flatten()
+	print 'new', xx
+	return xx
 	
 
 def sample():
 	g = EventGraph()
-	left = norm(loc=np.array([5.0]), scale=0.5)
-	right = norm(loc=np.array([-5.0]), scale=0.5)
-	jump = norm(loc=np.array([20.0]), scale=0.5)
+	left = norm(loc=np.array([5.0]), scale=0.1)
+	right = norm(loc=np.array([-5.0]), scale=0.1)
+	stop = norm(loc=np.array([0.0]), scale=0.1)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = choice([left, right, jump, None], size=(5,9), p=[0.4,0.3,0.2,0.1])
-	rvs = np.frompyfunc(lambda x:x.rvs() if x else None, 1, 1)
-	samples = rvs(sample)
+	sample = choice([left, right, stop], size=(1,15), p=[0.4,0.4,0.2,0.0])
+	
 	for aid, seq in enumerate (sample):
 		for t, atom in enumerate (seq):
 			if not atom is None:
@@ -124,14 +132,18 @@ def sample():
 	return g
 
 if __name__ == '__main__':
-	
-	g = kinetic(M=0, N=10)
+	np.set_printoptions(precision=5)
+	g = sample()
+	#g = kinetic(M=0, N=10)
 	#g = kinetic()
 	for i in range (5) :
 		if len(g.nodes()) < 2 :
 			break
-		means, covars = toProd(g, k=20, gamma=-3)
+		means, covars = toProd(g, k=10, gamma=-5)
+		print means
+		print means.reshape(2, len(means)/2)
+
 		drawG2(g, node_size=2000, cluster=True, label=True, output="test_%s"%i, 
-				title="%s"%(means))
+				title="%s"%(means.reshape(2, len(means)/2)))
 		
-		rewrite(g, means, covars, gamma=-3)
+		rewrite(g, means, covars, gamma=-5)
