@@ -54,17 +54,17 @@ def make_ellipses(model, ax, idx):
 		if (idx is None) or n==idx:
 			color = cm.jet(1.*n/k)
 			
-			v, w = np.linalg.eigh(model._get_covars()[n][[[2],[5]], [2,5]])
-			#v, w = np.linalg.eigh(model._get_covars()[n][:2, :2])
+			#v, w = np.linalg.eigh(model._get_covars()[n][[[2],[5]], [2,5]])
+			v, w = np.linalg.eigh(model._get_covars()[n][:2, :2])
 
 			u = w[0] / np.linalg.norm(w[0])
 			angle = np.arctan2(u[1], u[0])
 			angle = 180 * angle / np.pi  # convert to degrees
 			v *= 9
-			#ell = mpl.patches.Ellipse(model.means_[n, :2], v[0], v[1],
-			#	180 + angle, color=color)
-			ell = mpl.patches.Ellipse(model.means_[n, [2,5]], v[0], v[1],
+			ell = mpl.patches.Ellipse(model.means_[n, :2], v[0], v[1],
 				180 + angle, color=color)
+			#ell = mpl.patches.Ellipse(model.means_[n, [2,5]], v[0], v[1],
+			#	180 + angle, color=color)
 			ell.set_clip_box(ax.bbox)
 			ell.set_alpha(0.5)
 			ax.add_artist(ell)
@@ -82,10 +82,10 @@ def bestProd(sm, cluster):
 	return idx, logProds
 
 def toProd(graph, gamma=-4, k=10):
-	sm = semanticMatrix(g)
+	sm = semanticMatrix(graph)
 	n = sm.shape
 	print n, k
-	print sm
+	#print sm
 	cluster = gmm(sm, k=min(k, n[0]))
 	idx, logProd = bestProd(sm, cluster)
 	nx.set_edge_attributes(graph, "delta", dict(zip(graph.edges(), logProd)))
@@ -96,7 +96,7 @@ def toProd(graph, gamma=-4, k=10):
 		c[edge[1]] = 'pink'
 	nx.set_node_attributes(graph, 'cluster', c)
 	
-	#vis(sm[:,[2,5]], cluster, k=None)
+	#vis(sm, cluster, k=idx)
 	return cluster.means_[idx], cluster.covars_[idx]
 
 def rewrite(graph, means, covars, gamma=-4):
@@ -104,7 +104,7 @@ def rewrite(graph, means, covars, gamma=-4):
 	if len(edges) > 0:
 		for (x,y,d) in sorted(edges, key=lambda x:x[2]['delta'], reverse=True) :
 			if graph.has_node(x) and graph.has_node(y) :
-				nt = Event(-1, x._aids | y._aids, cutDim( means))
+				nt = Event(-1, x._aids | y._aids,means)
 				graph._merge(x, y, nt, d)
 				rewrite(graph, means, covars, gamma=gamma)
 

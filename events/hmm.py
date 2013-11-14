@@ -1,4 +1,5 @@
 from event import *
+from test import toProd, rewrite
 import datetime
 import numpy as np
 import pylab as pl
@@ -6,11 +7,22 @@ from matplotlib.finance import quotes_historical_yahoo
 from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
 from sklearn.hmm import GaussianHMM
 
+def graph(X):
+	g = EventGraph()
+	for aid, seq in enumerate (X):
+		for t, atom in enumerate (seq):
+			if not atom is None:
+				g.addEvent( Event(t, aid, atom ))
+	g.buildEdges(delta = 1)
+	print nx.info(g)
+	return g
+
+
 def sample():
 	###############################################################################
 	# Downloading the data
-	date1 = datetime.date(2012, 10, 1)  # start date
-	date2 = datetime.date(2013, 12, 1)  # end date
+	date1 = datetime.date(2011, 01, 1)  # start date
+	date2 = datetime.date(2012, 12, 1)  # end date
 	# get quotes from yahoo finance
 	quotes = quotes_historical_yahoo("INTC", date1, date2)
 	if len(quotes) == 0:
@@ -24,10 +36,10 @@ def sample():
 	# take diff of close value
 	# this makes len(diff) = len(close_t) - 1
 	# therefore, others quantity also need to be shifted
-	diff = close_v[1:] - close_v[:-1]
+	diff = 100 * ( np.exp( np.log(close_v[1:]) - np.log(close_v[:-1]) ) - 1 )
 	dates = dates[1:]
 	close_v = close_v[1:]
-
+	print diff
 	# pack diff and volume for training
 	#X = np.column_stack([diff, volume])
 	X = np.column_stack([diff])
@@ -95,7 +107,24 @@ def vis(dates, close_v, n_components):
 	pl.show()
 
 if __name__ == '__main__':
+	np.set_printoptions(precision=2)
 	n_components = 3
 	X, dates, close_v = sample()
-	hidden_states = train(X, n_components)
-	vis(dates, close_v, n_components)
+	#hidden_states = train(X, n_components)
+	#vis(dates, close_v, n_components)
+	#print X
+	g = graph([X])
+	
+	for i in range (4) :
+		if len(g.nodes()) < 2 :
+			break
+		means, covars = toProd(g, k=15, gamma=-5)
+		
+		print means.reshape(2, len(means)/2)
+		print covars.reshape(2, len(covars)/2)
+		
+
+		#drawG2(g, node_size=2000, cluster=True, label=True, output="pics/test_%s"%i, 
+		#		title="%s"%(means.reshape(2, len(means)/2)))
+
+		rewrite(g, means, covars, gamma=-5)
