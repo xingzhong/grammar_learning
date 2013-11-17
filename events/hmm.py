@@ -1,11 +1,12 @@
 from event import *
-from test import toProd, rewrite
+from test import toProd, rewrite, cutDim, semanticMatrix
 import datetime
 import numpy as np
 import pylab as pl
 from matplotlib.finance import quotes_historical_yahoo
 from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
 from sklearn.hmm import GaussianHMM
+from numpy.random import choice as choice
 
 def graph(X):
 	g = EventGraph()
@@ -17,11 +18,22 @@ def graph(X):
 	print nx.info(g)
 	return g
 
+def sample2():
+	g = EventGraph()
+	left = norm(loc=np.array([5.0]), scale=0.1)
+	right = norm(loc=np.array([-5.0]), scale=0.1)
+	stop = norm(loc=np.array([0.0]), scale=0.1)
+	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
+	sample = choice([left, right, stop, None], size=(1,30), p=[0.4,0.4,0.2,0.0])
+	#sample = [[left, left, left, stop, right, right, right]]
+	rvs = np.frompyfunc(lambda x: x.rvs(), 1, 1)
+	samples = rvs(sample)
+	return samples, None, None
 
 def sample():
 	###############################################################################
 	# Downloading the data
-	date1 = datetime.date(2011, 01, 1)  # start date
+	date1 = datetime.date(2012, 1, 1)  # start date
 	date2 = datetime.date(2012, 12, 1)  # end date
 	# get quotes from yahoo finance
 	quotes = quotes_historical_yahoo("INTC", date1, date2)
@@ -106,25 +118,89 @@ def vis(dates, close_v, n_components):
 	fig.autofmt_xdate()
 	pl.show()
 
+def vis2(dates, close_v, graph):
+	years = YearLocator()   # every year
+	months = MonthLocator()  # every month
+	yearsFmt = DateFormatter('%Y')
+	fig = pl.figure()
+	ax = fig.add_subplot(111)
+
+	idx1 = [n._tp for (n,d) in graph.nodes(data=True) 
+		if d.get('cluster', 'white') == "pink"]
+	idx2 = [n._tp for (n,d) in graph.nodes(data=True) 
+		if d.get('cluster', 'white') == "white"]
+
+	
+	ax.plot_date(dates[idx1], close_v[idx1], 'o', color='pink')
+	ax.plot_date(dates[idx2], close_v[idx2], 'o', color='blue')
+	ax.plot_date(dates, close_v, '--')
+	#for n in nodes1 :
+	#	ax.scatter(dates[n._tp], n._semantics, 'o', color='pink')
+	#for n in nodes2 :
+	#	ax.scatter(dates[n._tp], n._semantics, 'o', color='blue')
+
+	# format the ticks
+	ax.xaxis.set_major_locator(years)
+	ax.xaxis.set_major_formatter(yearsFmt)
+	ax.xaxis.set_minor_locator(months)
+	ax.autoscale_view()
+
+	# format the coords message box
+	ax.fmt_xdata = DateFormatter('%Y-%m-%d')
+	ax.fmt_ydata = lambda x: '$%1.2f' % x
+	ax.grid(True)
+
+	fig.autofmt_xdate()
+	pl.show()
+
+def drawbox(ax, graph):
+	#positions = [ x._tp for x, y in graph.edges()]
+	#medians = [ x._semantics[0] for x, y in graph.edges()]
+	#sm = semanticMatrix(graph)
+	#ax.boxplot(sm.T, positions=positions, usermedians=medians)
+	for x in graph.nodes():
+		yy = filter(lambda x: x!=0, x._semantics)
+		if len(yy) > 0 :
+			xx = [x._tp] * len(yy)
+			print xx
+			print yy
+			ax.plot(xx, yy, '_-', color='red', markersize=15)
+
+def drawG3(ax, graph, samples):
+	# only for vis 1 dimensonal data 
+	drawbox(ax, graph)
+	ax.plot(samples[0], '--.', color='black',alpha=0.3)
+	ax.grid()
+
 if __name__ == '__main__':
 	np.set_printoptions(precision=2)
 	n_components = 3
-	X, dates, close_v = sample()
+	X, dates, close_v = sample2()
 	#hidden_states = train(X, n_components)
 	#vis(dates, close_v, n_components)
-	#print X
-	g = graph([X])
-	
-	for i in range (4) :
-		if len(g.nodes()) < 2 :
-			break
-		means, covars = toProd(g, k=15, gamma=-5)
+	print X
+	g = graph(X)
+	gamma = -3
+	figsize=(18,8)
+	fig = pl.figure(figsize=figsize)
+	N = 6
+	for i in range (N) :
+		ax = fig.add_subplot(N, 1, i+1)
+		ax.set_title(i+1)
+		drawG3(ax, g, X)
+		try:
+			means, covars = toProd(g, k=10, gamma=gamma)
 		
-		print means.reshape(2, len(means)/2)
-		print covars.reshape(2, len(covars)/2)
-		
-
+			print means.reshape(2, len(means)/2)
+			print covars.reshape(2, len(covars)/2)
+			print cutDim(means)
+		#pprint (g.nodes(data=True))
 		#drawG2(g, node_size=2000, cluster=True, label=True, output="pics/test_%s"%i, 
 		#		title="%s"%(means.reshape(2, len(means)/2)))
-
-		rewrite(g, means, covars, gamma=-5)
+		
+			rewrite(g, cutDim(means), covars, gamma=gamma)
+			
+		except:
+			plt.show()
+	plt.show()
+	

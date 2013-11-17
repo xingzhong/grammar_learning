@@ -16,12 +16,13 @@ def semanticMatrix(g):
     for (x,y,d) in g.edges(data=True):
         left.append(x._semantics)
         right.append(y._semantics)
-    n = max( map( lambda x: x.shape[0], left ) )
-    for i,l in enumerate(left):
-        left[i] = np.append(l, [0]*(n-l.shape[0]))
+    m = max( map( lambda x: x.shape[0], left ) )
     n = max( map( lambda x: x.shape[0], right ) )
+    N = max(m, n)
+    for i,l in enumerate(left):
+        left[i] = np.append(l, [0]*(N-l.shape[0]))
     for i,r in enumerate(right):
-        right[i] = np.append(r, [0]*(n-r.shape[0]))
+        right[i] = np.append(r, [0]*(N-r.shape[0]))
     left = np.array(left)
     right = np.array(right)
     #print left
@@ -85,7 +86,7 @@ def toProd(graph, gamma=-4, k=10):
 	sm = semanticMatrix(graph)
 	n = sm.shape
 	print n, k
-	#print sm
+	print sm
 	cluster = gmm(sm, k=min(k, n[0]))
 	idx, logProd = bestProd(sm, cluster)
 	nx.set_edge_attributes(graph, "delta", dict(zip(graph.edges(), logProd)))
@@ -101,19 +102,22 @@ def toProd(graph, gamma=-4, k=10):
 
 def rewrite(graph, means, covars, gamma=-4):
 	edges = filter(lambda x: x[2]['delta'] > gamma, graph.edges(data=True))
+	
 	if len(edges) > 0:
 		for (x,y,d) in sorted(edges, key=lambda x:x[2]['delta'], reverse=True) :
 			if graph.has_node(x) and graph.has_node(y) :
-				nt = Event(-1, x._aids | y._aids,means)
+				nt = Event(-1, x._aids | y._aids, means )
 				graph._merge(x, y, nt, d)
 				rewrite(graph, means, covars, gamma=gamma)
 
 def cutDim(x) :
-	print 'old', x
+	#print 'old', x
 	xx = x.reshape(2, len(x)/2)
-	xx = xx[:, np.any(xx, axis=0)].flatten()
-	print 'new', xx
-	return xx
+	idx = np.max( np.where( np.any(np.abs(xx)>1e-10, axis=0) ))
+	xxx = xx[:, :idx+1].flatten()
+	#import pdb; pdb.set_trace()
+	#print 'new', xxx
+	return xxx
 	
 
 def sample():
@@ -122,7 +126,7 @@ def sample():
 	right = norm(loc=np.array([-5.0]), scale=0.1)
 	stop = norm(loc=np.array([0.0]), scale=0.1)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = choice([left, right, stop], size=(1,15), p=[0.4,0.4,0.2,0.0])
+	sample = choice([left, right, stop, None], size=(1,15), p=[0.4,0.4,0.2,0.0])
 	
 	for aid, seq in enumerate (sample):
 		for t, atom in enumerate (seq):
@@ -146,4 +150,4 @@ if __name__ == '__main__':
 		drawG2(g, node_size=2000, cluster=True, label=True, output="test_%s"%i, 
 				title="%s"%(means.reshape(2, len(means)/2)))
 		
-		rewrite(g, means, covars, gamma=-5)
+		rewrite(g, cutDim(means), covars, gamma=-5)
