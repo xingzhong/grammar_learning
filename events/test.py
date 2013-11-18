@@ -86,7 +86,7 @@ def toProd(graph, gamma=-4, k=10):
 	sm = semanticMatrix(graph)
 	n = sm.shape
 	print n, k
-	print sm
+	#print sm
 	cluster = gmm(sm, k=min(k, n[0]))
 	idx, logProd = bestProd(sm, cluster)
 	nx.set_edge_attributes(graph, "delta", dict(zip(graph.edges(), logProd)))
@@ -110,14 +110,16 @@ def rewrite(graph, means, covars, gamma=-4):
 				graph._merge(x, y, nt, d)
 				rewrite(graph, means, covars, gamma=gamma)
 
-def cutDim(x) :
+def cutDim(x, y) :
 	#print 'old', x
 	xx = x.reshape(2, len(x)/2)
+	yy = y.reshape(2, len(x)/2)
 	idx = np.max( np.where( np.any(np.abs(xx)>1e-10, axis=0) ))
 	xxx = xx[:, :idx+1].flatten()
+	yyy = yy[:, :idx+1].flatten()
 	#import pdb; pdb.set_trace()
 	#print 'new', xxx
-	return xxx
+	return xxx, yyy
 	
 
 def sample():
@@ -149,5 +151,5 @@ if __name__ == '__main__':
 
 		drawG2(g, node_size=2000, cluster=True, label=True, output="test_%s"%i, 
 				title="%s"%(means.reshape(2, len(means)/2)))
-		
-		rewrite(g, cutDim(means), covars, gamma=-5)
+		means, covars = cutDim(means, covars)
+		rewrite(g, means, covars, gamma=-5)

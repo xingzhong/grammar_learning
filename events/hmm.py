@@ -20,12 +20,12 @@ def graph(X):
 
 def sample2():
 	g = EventGraph()
-	left = norm(loc=np.array([5.0]), scale=0.1)
-	right = norm(loc=np.array([-5.0]), scale=0.1)
-	stop = norm(loc=np.array([0.0]), scale=0.1)
+	left = norm(loc=np.array([5.0]), scale=1)
+	right = norm(loc=np.array([-5.0]), scale=1)
+	stop = norm(loc=np.array([0.0]), scale=1)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
-	sample = choice([left, right, stop, None], size=(1,30), p=[0.4,0.4,0.2,0.0])
-	#sample = [[left, left, left, stop, right, right, right]]
+	#sample = choice([left, right, stop], size=(1,30), p=[0.4,0.4,0.2])
+	sample = [[left, left, left, left, stop, stop, right, right, right]*4]
 	rvs = np.frompyfunc(lambda x: x.rvs(), 1, 1)
 	samples = rvs(sample)
 	return samples, None, None
@@ -180,7 +180,7 @@ if __name__ == '__main__':
 	#vis(dates, close_v, n_components)
 	print X
 	g = graph(X)
-	gamma = -3
+	gamma = -5
 	figsize=(18,8)
 	fig = pl.figure(figsize=figsize)
 	N = 6
@@ -193,12 +193,12 @@ if __name__ == '__main__':
 		
 			print means.reshape(2, len(means)/2)
 			print covars.reshape(2, len(covars)/2)
-			print cutDim(means)
+			means, covars =  cutDim(means, covars)
 		#pprint (g.nodes(data=True))
 		#drawG2(g, node_size=2000, cluster=True, label=True, output="pics/test_%s"%i, 
 		#		title="%s"%(means.reshape(2, len(means)/2)))
 		
-			rewrite(g, cutDim(means), covars, gamma=gamma)
+			rewrite(g, means, covars, gamma=gamma)
 			
 		except:
 			plt.show()
