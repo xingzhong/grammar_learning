@@ -15,9 +15,9 @@ class Prod:
 	def __init__(self, lhs, rhs1, rhs2, op='='):
 		self.lhs = lhs
 		self.left = rhs1
-		self.ldim = len(self.left[0])
+		self.ldim = self.left._nd
 		self.right = rhs2
-		self.rdim = len(self.right[0])
+		self.rdim = self.right._nd
 		self.op = op
 
 	def __repr__(self):
@@ -32,7 +32,7 @@ def sample():
 	stop = norm(loc=np.array([0.0]), scale=0.1)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
 	#sample = choice([left, right, stop, None], size=(1,15), p=[0.4,0.4,0.2,0.0])
-	sample = [[left, left, left, left, stop, left, left] * 2]
+	sample = [[left, left, left, stop, stop, right, right, right] * 2]
 	for aid, seq in enumerate (sample):
 		for t, atom in enumerate (seq):
 			if not atom is None:
@@ -99,35 +99,27 @@ def toProd(graph, gamma=-4, k=10):
 	rMean, rCov = trim(rMean, rCov)
 	
 	#import pdb; pdb.set_trace()
-	print 'debug', lMean, rMean
-	if len(lMean) != len(rMean):
-		div = 10
-	else:
-		div = np.sum ( np.std( np.vstack((lMean, rMean)), axis=0 ) )
+	#print 'debug', lMean, rMean
+	div = Dist(lMean, lCov) - Dist(rMean, rCov)
 	
 	if div > 1 :
 		means = np.hstack((lMean, rMean))
-		print 'two', means
-		return Prod( means, (lMean, lCov), (rMean, rCov) )
+		covs = np.hstack((lCov, rCov))
+		#print 'two', means
+		return Prod( Dist(means, covs), Dist(lMean, lCov), Dist(rMean, rCov) )
 	else:
-		means = np.mean( np.vstack((lMean, rMean)), axis=0)
-		print 'single', means
-		return Prod( means, (lMean, lCov), (rMean, rCov) )
+		#means = np.mean( np.vstack((lMean, rMean)), axis=0)
+		#print 'single', means
+		return Prod( Dist(lMean, lCov), Dist(lMean, lCov), Dist(rMean, rCov) )
 
 def parse(graph, prod, gamma=-4):
 	edges = []
 	for (x,y,d) in graph.edges(data=True):
-		#print x._semantics, prod.left, prod.ldim
-		#print y._semantics, prod.right, prod.rdim
-		if len(x._semantics) == prod.ldim and len(y._semantics) == prod.rdim:
-			logLeft = log_multivariate_normal_density(
-							np.array([x._semantics]), 
-							np.array([prod.left[0]]), 
-							np.array([prod.left[1]]) )
-			logRight = log_multivariate_normal_density(
-							np.array([y._semantics]), 
-							np.array([prod.right[0]]), 
-							np.array([prod.right[1]]) )
+		#print x._semantics, x._semantics.shape, prod.left, prod.ldim
+		#print y._semantics, y._semantics.shape, prod.right, prod.rdim
+		if x._semantics.shape == prod.ldim and y._semantics.shape == prod.rdim:
+			logLeft = prod.left.logPdf(x._semantics)
+			logRight = prod.right.logPdf(y._semantics)
 			logP = logLeft + logRight
 			if logP > gamma:
 				edges.append( (x,y,d))
@@ -140,7 +132,7 @@ def rewrite(graph, prod, gamma=-4):
 	if len(edges) > 0:
 		for (x,y,d) in edges :
 			if graph.has_node(x) and graph.has_node(y) :
-				nt = Event(-1, x._aids | y._aids, prod.lhs )
+				nt = Event(-1, x._aids | y._aids, prod.lhs._mean )
 				graph._merge(x, y, nt, d)
 				#break
 				rewrite(graph, prod, gamma=gamma)
@@ -168,6 +160,69 @@ def VisGraph(G, ax, node_size=1600, offset=0, edge=True, label=True):
         #edge_labels = { (u,v) : "%.2f"%d[weight] for (u,v,d) in G.edges(data=True) }
         #nx.draw_networkx_edge_labels(G, ax=ax, pos=initPos, edge_labels=edge_labels, font_size=10,font_family='sans-serif', alpha=0.5)
     
+class Grammar ():
+	def __init__(self):
+		self._prods = []
+		self._nts = {}
+		self.num = 0
+
+	def addNT(self, dist):
+		for key, item in self._nts.iteritems():
+			if item - dist < 1:
+				return key
+		self.num += 1
+		self._nts["NT%s"%self.num] = dist
+		return "NT%s"%self.num
+
+	def addProd(self, prod):
+		left = self.addNT(prod.left)
+		right = self.addNT(prod.right)
+		lhs = self.addNT(prod.lhs)
+		self._prods.append( (lhs, left, right) )
+
+def gau_kl(pm, pv, qm, qv):
+    """
+    Kullback-Liebler divergence from Gaussian pm,pv to Gaussian qm,qv.
+    Also computes KL divergence from a single Gaussian pm,pv to a set
+    of Gaussians qm,qv.
+    Diagonal covariances are assumed.  Divergence is expressed in nats.
+    """
+    # Determinants of diagonal covariances pv, qv
+    dpv = pv.prod()
+    dqv = qv.prod()
+    # Inverse of diagonal covariance qv
+    iqv = 1./qv
+    # Difference between means pm, qm
+    diff = qm - pm
+    return (0.5 *
+            (np.log(dqv / dpv)            # log |\Sigma_q| / |\Sigma_p|
+             + (iqv * pv).sum()          # + tr(\Sigma_q^{-1} * \Sigma_p)
+             + (diff * iqv * diff).sum() # + (\mu_q-\mu_p)^T\Sigma_q^{-1}(\mu_q-\mu_p)
+             - len(pm)))                     # - N
+
+
+
+class Dist():
+	def __init__(self, mean, covar):
+		self._mean = np.array(mean)
+		self._covar = np.array(covar) 
+		self._nd = mean.shape
+
+	def sample(self):
+		return sample_gaussian(self._mean, self._covar)
+
+	def logPdf(self, x):
+		x = np.array([x], ndmin=2)
+		return log_multivariate_normal_density(x, np.array([self._mean]), np.array([self._covar]))
+
+	def __sub__(self, other):
+		if self._nd == other._nd :
+			return gau_kl(self._mean, self._covar, other._mean, other._covar)
+		else:
+			return np.inf
+	def __repr__(self):
+		return "(%s %s)"%(str(self._mean), str(self._covar))
+
 
 if __name__ == '__main__':
 	figsize=(30,8)
@@ -176,7 +231,8 @@ if __name__ == '__main__':
 	np.set_printoptions(precision=3)
 	g = sample()
 	gamma = -8
-	for i in range(6):
+	grammar = Grammar()
+	for i in range(3):
 		print i
 		VisGraph(g, ax, offset=i)
 		if len(g.nodes()) < 3:
@@ -184,7 +240,10 @@ if __name__ == '__main__':
 		
 		p = toProd(g, k=8, gamma=gamma)
 		print p
+		grammar.addProd(p)
 		rewrite(g, p, gamma=gamma)
-		
+	
+	pprint (grammar._nts)
+	pprint (grammar._prods)
 	plt.show()
 	
