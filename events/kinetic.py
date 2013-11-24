@@ -16,8 +16,9 @@ def instance_generator (panel, truth):
         old = t
         yield np.array( sample )
 
-def kinetic(fileName='P2_1_9_p07', M=None, N=None):
-	FILE  = "/home/xingzhong/MicrosoftGestureDataset-RC/data/%s"%fileName
+def kinetic(fileName='P2_1_9_p07', M=None, N=None, axis=None):
+	#FILE  = "/home/xingzhong/MicrosoftGestureDataset-RC/data/%s"%fileName
+	FILE  = "/Users/xingzhong/Downloads/MicrosoftGestureDataset-RC/data/%s"%fileName
 	truth = np.genfromtxt(FILE+'.tagstream', delimiter=';', skiprows=1, dtype=None, converters={0: lambda x: (int(x) *1000 + 49875/2)/49875})
 	nd = np.loadtxt(FILE+'.csv')
 	nd = nd[np.where(nd[:,80]!=0)]# remove empty rows
@@ -30,7 +31,7 @@ def kinetic(fileName='P2_1_9_p07', M=None, N=None):
 	panel = panel.transpose(2, 1, 0)
 	samples =  [s for s in instance_generator(panel, truth)] 
 	g = EventGraph()
-
+	X = [np.array([0])]
 	for aid, seq in enumerate (samples[0]):
 		if M is not None and aid > M :
 			break
@@ -38,12 +39,16 @@ def kinetic(fileName='P2_1_9_p07', M=None, N=None):
 			if N is not None and t > N:
 				break
 			elif not atom is None and t!=0:
-
-				g.addEvent( Event(t, aid, atom ))
+				if axis:
+					g.addEvent( Event(t, aid, atom ))
+					X.append(atom)
+				else:
+					g.addEvent( Event(t, aid, np.array([atom[axis]]) ))
+					X.append( np.array([atom[axis]]) )
 
 	g.buildEdges(delta = 1)
 	print nx.info(g)
-	return g
+	return g, X
 
 if __name__ == '__main__':
 	g = kinetic(M=0, N=10)

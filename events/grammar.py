@@ -43,7 +43,6 @@ class PCFG(object):
 	def __init__(self):
 		self.prods = []
 
-
 	def nts(self):
 		return [ (p.B, p.C, p._name) for p in self.prods]
 		#return sum(nts, []) #flatten the 2 dim list
@@ -59,14 +58,39 @@ class PCFG(object):
 				x.C.setName(name)
 		self.prods.append(x)
 
+	def start(self):
+		return self.prods[-1]
+
+	def _sample(self, x):
+		for (b, c, name) in self.nts():
+			if x.name == name :
+				return np.concatenate((self._sample(b), self._sample(c)))
+			
+		return x.sample() 
+
+	def sampling(self):
+		start = self.start()
+		return np.concatenate( (self._sample( start.B ), self._sample( start.C ) ))
+
+	def deep(self, x):
+		if isinstance(x, list):
+			for xx in x:
+				return self.deep(xx)
+		else:
+			return x
+
 if __name__ == '__main__':
 	from hmm import *
+	from kinetic import kinetic
 
 	np.set_printoptions(precision=2)
 	X, dates, close_v = sample2()
+	#g, X = kinetic(M=0, N=100, axis=0)
 	g = graph(X)
-	gamma = -5
-	N = 8
+	#X = np.array([X])
+	#import pdb; pdb.set_trace()
+	gamma = -6
+	N = 10
 	figsize=(18,8)
 	fig = pl.figure(figsize=figsize)
 	grammar = PCFG()
@@ -75,13 +99,27 @@ if __name__ == '__main__':
 		ax = fig.add_subplot(N, 1, i+1)
 		ax.set_title(i+1)
 		drawG3(ax, g, X)
+		if len(g.nodes()) < 3:
+			break
 		means, covars = toProd(g, k=10, gamma=gamma)
 		#means, covars = cutDim(means, covars)
 		p = Prod(means, covars, idx=i)
 		grammar.add(p)
-		rewrite(g, p.toRewrite(), None, gamma=gamma)
-	
+		rewrite(g, means, covars, gamma=gamma)
+
 	for nt in grammar.prods:
 		print nt
+	
+
+	sample = grammar.sampling()
+	print 
+	print sample
+	
+	#ax = fig.add_subplot(N, 1, N)
+	#ax.plot(sample, '-o')
+	#ax.grid()
 	plt.show()
+	
+	#
+	
 	

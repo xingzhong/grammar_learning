@@ -19,16 +19,20 @@ def graph(X):
 	return g
 
 def sample2():
-	g = EventGraph()
-	left = norm(loc=np.array([5.0]), scale=1)
-	right = norm(loc=np.array([-5.0]), scale=1)
-	stop = norm(loc=np.array([0.0]), scale=1)
+
+	left = norm(loc=np.array([1.0]), scale=.1)
+	right = norm(loc=np.array([-1.0]), scale=.1)
+	stop = norm(loc=np.array([0.0]), scale=.1)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
 	#sample = choice([left, right, stop], size=(1,30), p=[0.4,0.4,0.2])
-	sample = [[left, left, left, left, stop, stop, right, right, right]*4]
-	rvs = np.frompyfunc(lambda x: x.rvs(), 1, 1)
-	samples = rvs(sample)
-	return samples, None, None
+	sample = [[left, left, stop, left, right, right, stop, right, right, right]*4]
+	m,n = np.array(sample).shape
+	samples = []
+	for i in range(m):
+		samples.append([])
+		for j in range(n):
+			samples[i].append(sample[i][j].rvs())
+	return np.array(samples), None, None
 
 def sample():
 	###############################################################################
@@ -61,7 +65,6 @@ def train(X, n_components):
 	###############################################################################
 	# Run Gaussian HMM
 	print("fitting to HMM and decoding ...")
-	
 
 	# make an HMM instance and execute fit
 	model = GaussianHMM(
@@ -89,33 +92,27 @@ def train(X, n_components):
 	    print("var = ", np.diag(model.covars_[i]))
 	    print()
 
-	return hidden_states
+	return hidden_states, model
 
-def vis(dates, close_v, n_components):
-	years = YearLocator()   # every year
-	months = MonthLocator()  # every month
-	yearsFmt = DateFormatter('%Y')
-	fig = pl.figure()
-	ax = fig.add_subplot(111)
-
+def _vis(ax, sample, hidden_states, n_components):
+	xx = np.array( range( len(hidden_states) ) )
 	for i in range(n_components):
 	    # use fancy indexing to plot data in each state
 	    idx = (hidden_states == i)
-	    ax.plot_date(dates[idx], close_v[idx], 'o', label="%dth hidden state" % i)
+	    ax.plot(xx[idx], sample[idx], 'o', label="%dth hidden state" % i)
+	ax.plot(xx, sample, '--', color='black', alpha=0.8)
+	ax.grid()
 	ax.legend()
 
-	# format the ticks
-	ax.xaxis.set_major_locator(years)
-	ax.xaxis.set_major_formatter(yearsFmt)
-	ax.xaxis.set_minor_locator(months)
-	ax.autoscale_view()
-
-	# format the coords message box
-	ax.fmt_xdata = DateFormatter('%Y-%m-%d')
-	ax.fmt_ydata = lambda x: '$%1.2f' % x
-	ax.grid(True)
-
-	fig.autofmt_xdate()
+def vis(sample, hidden_states, n_components, model):
+	figsize=(18,8)
+	fig = pl.figure(figsize=figsize)
+	n = len(hidden_states)
+	ax = fig.add_subplot(211)
+	_vis(ax, sample, hidden_states, n_components)
+	bx = fig.add_subplot(212)
+	sample2, hidden_states2 = model.sample(100)
+	_vis(bx, sample2, hidden_states2, n_components)
 	pl.show()
 
 def vis2(dates, close_v, graph):
@@ -164,26 +161,26 @@ def drawbox(ax, graph):
 			xx = [x._tp] * len(yy)
 			print xx
 			print yy
-			ax.plot(xx, yy, '_-', color='red', markersize=15)
+			ax.plot(xx, yy, '_-', color='red', markersize=15, markeredgewidth=3)
 
 def drawG3(ax, graph, samples):
 	# only for vis 1 dimensonal data 
 	drawbox(ax, graph)
-	ax.plot(samples[0], '--.', color='black',alpha=0.3)
+	ax.plot(samples[0], '--.', color='black',alpha=0.8)
 	ax.grid()
 
 if __name__ == '__main__':
 	np.set_printoptions(precision=2)
 	n_components = 3
 	X, dates, close_v = sample2()
-	#hidden_states = train(X, n_components)
-	#vis(dates, close_v, n_components)
-	print X
+	hidden_states, model = train(X[0], n_components)
+	vis(X[0], hidden_states, n_components, model)
+	#print X
 	g = graph(X)
 	gamma = -5
 	figsize=(18,8)
 	fig = pl.figure(figsize=figsize)
-	N = 6
+	N = 1
 	for i in range (N) :
 		ax = fig.add_subplot(N, 1, i+1)
 		ax.set_title(i+1)

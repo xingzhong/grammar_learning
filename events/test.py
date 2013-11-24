@@ -78,11 +78,13 @@ def vis(sm, cluster, k=None):
 	vis2D(sm, ax)
 
 def bestProd(sm, cluster):
+	# select the maximum weight cluster
 	idx = np.argmax(cluster.weights_)
 	logProds = log_multivariate_normal_density(sm, np.array([cluster.means_[idx]]), np.array([cluster.covars_[idx]]))
 	return idx, logProds
 
 def toProd(graph, gamma=-4, k=10):
+	# given data graph, extract a vaild production
 	sm = semanticMatrix(graph)
 	n = sm.shape
 	print n, k
@@ -100,15 +102,45 @@ def toProd(graph, gamma=-4, k=10):
 	#vis(sm, cluster, k=idx)
 	return cluster.means_[idx], cluster.covars_[idx]
 
+def parse(graph, means, covars, gamma=-4):
+	edges = []
+	means2 = means.reshape(2, len(means)/2)
+	lMean = means2[0, :]
+	rMean = means2[1, :]
+	for (x,y,d) in graph.edges(data=True):
+		semantics = np.hstack((x._semantics, y._semantics))
+		print '\ndebug'
+		print x._semantics, lMean
+		print y._semantics, rMean
+		if len(lMean) > 1:
+			import pdb; pdb.set_trace()
+		if len(semantics) == len(means):
+			logP = log_multivariate_normal_density(
+				np.array([semantics]), 
+				np.array([means]), 
+				np.array([covars]) )
+			if logP > gamma:
+				edges.append( (x,y,d))
+	return edges
+
 def rewrite(graph, means, covars, gamma=-4):
-	edges = filter(lambda x: x[2]['delta'] > gamma, graph.edges(data=True))
-	
+	edges = filter(lambda x: x[2]['delta'] > gamma, graph.edges(data=True))    
 	if len(edges) > 0:
 		for (x,y,d) in sorted(edges, key=lambda x:x[2]['delta'], reverse=True) :
 			if graph.has_node(x) and graph.has_node(y) :
 				nt = Event(-1, x._aids | y._aids, means )
 				graph._merge(x, y, nt, d)
 				rewrite(graph, means, covars, gamma=gamma)
+
+def rewrite2(graph, means, covars, gamma=-4):
+	edges = parse(graph, means, covars, gamma=gamma)
+	pprint (edges)
+	if len(edges) > 0:
+		for (x,y,d) in edges :
+			if graph.has_node(x) and graph.has_node(y) :
+				nt = Event(-1, x._aids | y._aids, means )
+				graph._merge(x, y, nt, d)
+				rewrite2(graph, means, covars, gamma=gamma)
 
 def cutDim(x, y) :
 	#print 'old', x
@@ -142,7 +174,7 @@ if __name__ == '__main__':
 	g = sample()
 	#g = kinetic(M=0, N=10)
 	#g = kinetic()
-	for i in range (5) :
+	for i in range (4) :
 		if len(g.nodes()) < 2 :
 			break
 		means, covars = toProd(g, k=10, gamma=-5)
@@ -152,4 +184,4 @@ if __name__ == '__main__':
 		drawG2(g, node_size=2000, cluster=True, label=True, output="test_%s"%i, 
 				title="%s"%(means.reshape(2, len(means)/2)))
 		means, covars = cutDim(means, covars)
-		rewrite(g, means, covars, gamma=-5)
+		rewrite2(g, means, covars, gamma=-5)
