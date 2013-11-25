@@ -32,13 +32,16 @@ def sample():
 	stop = norm(loc=np.array([0.0]), scale=0.1)
 	#sample = np.random.choice([left, right, stop, None], size=(4,6), p=[0.3,0.3,0.3,0.1])
 	#sample = choice([left, right, stop, None], size=(1,15), p=[0.4,0.4,0.2,0.0])
-	sample = [[left, left, left, stop, stop, right, right, right] * 2]
+	sample = [[left, left, left, stop, stop, right, right, right] ]
+	samples = []
 	for aid, seq in enumerate (sample):
 		for t, atom in enumerate (seq):
 			if not atom is None:
-				g.addEvent( Event(t, aid, atom.rvs() ))
+				rv = atom.rvs()
+				samples.append(rv)
+				g.addEvent( Event(t, aid,  rv))
 	g.buildEdges(delta = 1)
-	return g
+	return g, np.array(samples)
 
 def semanticMatrix(g):
     left = []
@@ -84,15 +87,19 @@ def trim(mean, covar=None):
 	else:
 		return mean[:idx+1]
 
-def toProd(graph, gamma=-4, k=10):
+def toProd(graph, gamma=-4, k=10, delta=10):
 	# given data graph, extract a vaild production
 	sm = semanticMatrix(graph)
 	n = sm.shape
 	print n
 	print sm
-	cluster = gmm(sm, k=min(k, n[0]))
-	idx, logProd = bestProd(sm, cluster)
-	means, covars = cluster.means_[idx], cluster.covars_[idx]
+	if n[0] > 1:
+		cluster = gmm(sm, k=min(k, n[0]))
+		idx, logProd = bestProd(sm, cluster)
+		means, covars = cluster.means_[idx], cluster.covars_[idx]
+	else:
+		means, covars = sm[0], [1e-3]*n[1]
+
 	lMean, rMean = means[:len(means)/2], means[len(means)/2:]
 	lCov, rCov = covars[:len(covars)/2], covars[len(covars)/2:]
 	lMean, lCov = trim(lMean, lCov)
@@ -102,7 +109,7 @@ def toProd(graph, gamma=-4, k=10):
 	#print 'debug', lMean, rMean
 	div = Dist(lMean, lCov) - Dist(rMean, rCov)
 	
-	if div > 1 :
+	if div > delta :
 		means = np.hstack((lMean, rMean))
 		covs = np.hstack((lCov, rCov))
 		#print 'two', means
@@ -161,14 +168,15 @@ def VisGraph(G, ax, node_size=1600, offset=0, edge=True, label=True):
         #nx.draw_networkx_edge_labels(G, ax=ax, pos=initPos, edge_labels=edge_labels, font_size=10,font_family='sans-serif', alpha=0.5)
     
 class Grammar ():
-	def __init__(self):
+	def __init__(self, delta=10):
 		self._prods = []
 		self._nts = {}
 		self.num = 0
+		self._delta = delta
 
 	def addNT(self, dist):
 		for key, item in self._nts.iteritems():
-			if item - dist < 1:
+			if item - dist < self._delta:
 				return key
 		self.num += 1
 		self._nts["NT%s"%self.num] = dist
@@ -179,6 +187,9 @@ class Grammar ():
 		right = self.addNT(prod.right)
 		lhs = self.addNT(prod.lhs)
 		self._prods.append( (lhs, left, right) )
+
+	def start(self):
+		return "NT%s"%self.num
 
 def gau_kl(pm, pv, qm, qv):
     """
@@ -199,8 +210,6 @@ def gau_kl(pm, pv, qm, qv):
              + (iqv * pv).sum()          # + tr(\Sigma_q^{-1} * \Sigma_p)
              + (diff * iqv * diff).sum() # + (\mu_q-\mu_p)^T\Sigma_q^{-1}(\mu_q-\mu_p)
              - len(pm)))                     # - N
-
-
 
 class Dist():
 	def __init__(self, mean, covar):
@@ -229,13 +238,13 @@ if __name__ == '__main__':
 	fig = plt.figure(figsize=figsize)
 	ax = fig.add_subplot(1, 1, 1)
 	np.set_printoptions(precision=3)
-	g = sample()
+	g, _ = sample()
 	gamma = -8
-	grammar = Grammar()
-	for i in range(3):
-		print i
+	grammar = Grammar(delta=10)
+	for i in range(20):
+		print i, len(g.nodes())
 		VisGraph(g, ax, offset=i)
-		if len(g.nodes()) < 3:
+		if len(g.nodes()) < 2:
 			break
 		
 		p = toProd(g, k=8, gamma=gamma)
@@ -245,5 +254,6 @@ if __name__ == '__main__':
 	
 	pprint (grammar._nts)
 	pprint (grammar._prods)
+	#import pdb; pdb.set_trace()
 	plt.show()
 	
