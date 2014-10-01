@@ -1,4 +1,5 @@
 *.py[co]
+*.avi
 *.eps
 # Packages
 *.egg
