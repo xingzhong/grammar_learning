@@ -60,9 +60,7 @@ def build(bp, root):
 
 if __name__ == '__main__':
 	_, S = sample()
-	print S
-	S = np.random.normal( 0, 1, size=(15,1))
-	print S
+	
 	A = Dist(np.array([0.0]), np.array([0.1]))
 	B = Dist(np.array([5.0]), np.array([0.1]))
 	C = Dist(np.array([-5.0]), np.array([0.1]))
