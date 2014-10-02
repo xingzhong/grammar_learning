@@ -172,9 +172,9 @@ def mapping(args):
 		writer = csv.writer(csv_file, delimiter=',')
 		for (a,b), (c,d) in zip(courtPts, rawPts):
 			writer.writerow([a,b,c,d])
-	#cap.release()
-	#cv2.destroyAllWindows()
-	grid(args)
+	cap.release()
+	cv2.destroyAllWindows()
+	#grid(args)
 
 def neighbors(src, dstIdx, nbrs, d=5):
 
@@ -219,7 +219,7 @@ def grid(args):
 		while cnt:
 			cv2.warpPerspective(tpl, M, (frame_w, frame_h), dst = cRot)
 
-			oKeys, nKeys = neighbors(cRot, dstIdx, nbrs, d=15)
+			oKeys, nKeys = neighbors(cRot, dstIdx, nbrs, d=10)
 			dm, ret = cv2.findHomography(oKeys, nKeys)
 			M = np.dot( dm , M )
 			cv2.bitwise_and(cRot, closing, dst=blank)
@@ -279,8 +279,10 @@ def main():
 	params = {'src' : args['src'], 
 				"dst" : "%s/init.csv"%args['dst'],
 				"grid" : "%s/grid"%args['dst']}
-
-	mapping(params)
+	if os.path.isfile(params['dst']):	#init already existed
+		grid(params)
+	else:
+		mapping(params)
 
 def demo():
 	args = {'src' : "../data/heat3.avi", 

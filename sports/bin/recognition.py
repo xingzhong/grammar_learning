@@ -7,6 +7,7 @@ from sklearn import mixture
 from sklearn.pcfg import PCFG, Production, Terminal, Grammar, Nonterminal
 from sklearn.mixture.gmm import log_multivariate_normal_density
 from itertools import combinations, permutations
+import csv 
 
 def movingaverage(interval, window_size):
     window = np.ones(int(window_size))/float(window_size)
@@ -600,6 +601,7 @@ def recognition(args):
 	HOOP /= 2
 	HOOP = HOOP[0]
 	routes = np.load(args['route'])
+	dst = args['dst']
 	team = routes[-1,:,1]
 	coord = np.array( map(np.vstack, routes[...,0]))
 	m, n, _ = coord.shape
@@ -612,10 +614,12 @@ def recognition(args):
 	lik, tree = model.decode(sampleData)
 	decodes = []
 	for x in tree.BFS():
-		#if x[1][0] == x[1][1]:
-		decodes.append(x)
-	for x in sorted(decodes, key=lambda x:x[1][0]):
-		print x
+		if x[1][0] == x[1][1]:
+			decodes.append(x)
+	with open(dst, "wb") as csv_file:
+		writer = csv.writer(csv_file, delimiter=',')
+		for x in sorted(decodes, key=lambda x:x[1][0]):
+			writer.writerow(x)
 
 def main():
 	
@@ -625,7 +629,15 @@ def main():
 	if args['src'][-1] != '/':
 		args['src'] = args['src'] + "/"
 	args['route'] = '%sroute.npy'%args['src']
-	
+	args['dst'] = '%sdecode.csv'%args['src']
+	recognition(args)
+
+def wrapper_recognition(src):
+	args = {'src':src}
+	if args['src'][-1] != '/':
+		args['src'] = args['src'] + "/"
+	args['route'] = '%sroute.npy'%args['src']
+	args['dst'] = '%sdecode.csv'%args['src']
 	recognition(args)
 
 if __name__ == '__main__':

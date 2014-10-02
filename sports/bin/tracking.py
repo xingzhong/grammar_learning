@@ -339,6 +339,17 @@ def main():
 			"noDebug" : None}
 	trajectory(params)
 
+def tracking_wrapper(src):
+	args = {'src':src}
+	if args['src'][-1] != '/':
+		args['src'] = args['src'] + "/"
+	params = {'src' : "%sgrid.avi"%args['src'], 
+			"tran": "%sgrid.m.npy"%args['src'],
+			"dst" : "%sdetect.avi"%args['src'],
+			"route": "%sroute.npy"%args['src'],
+			"noDebug" : None}
+	trajectory(params)
+
 def demo():
 	args = {'src' : "../data/heat3.avi", 
 			"tran": "../data/heat3.1.grid.m.npy",
