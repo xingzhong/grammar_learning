@@ -46,6 +46,7 @@ def defVector(polar, team):
 	
 	vectors = np.vstack(vectors)
 	vectors = np.swapaxes(vectors, 0, 1)
+	#import ipdb; ipdb.set_trace()
 	return vectors.reshape(-1,8)
 	#return np.sum(scores, axis=0)
 
@@ -540,7 +541,7 @@ def heat7():
 		print x
 	import ipdb; ipdb.set_trace()
 
-def prGrammar(alpha=100, beta=-50, gamma=-200, theta=-500):
+def prGrammar(alpha=100, beta=-50, gamma=-100, theta=-100):
 	S = Nonterminal('S')
 	PR = Nonterminal('PR')
 	PICK = Nonterminal('PICK')
@@ -552,37 +553,42 @@ def prGrammar(alpha=100, beta=-50, gamma=-200, theta=-500):
 	pick1 = Nonterminal('pick1')
 	NULL = Nonterminal('NULL')
 	Block = Nonterminal('Block')
-	Defence = Nonterminal('Defence')
+	DefBad = Nonterminal('DefBad')
+	DefGood = Nonterminal('DefGood')
+
 
 	gBlock = mixture.GMM(n_components=1)
 	gBlock.means_ = np.array([[alpha]])
-	gBlock.covars_ = np.array([[1]])
+	gBlock.covars_ = np.array([[5]])
 
 	block = Terminal('block', None, None, cb=lambda x:blockGood(x, range(12,20), gBlock))
 	nonBlock = Terminal('nonBlock', None, None, cb=lambda x:blockBad(x, range(12,20), gBlock, beta))
 
 	gPick = mixture.GMM(n_components=2)
-	gPick.means_ = np.array([[100, .3], [100, -.3]])
-	gPick.covars_ = np.array([[50, 1e-3], [50, 1e-3]])
+	gPick.means_ = np.array([[-100, .3], [-100, -.3]])
+	gPick.covars_ = np.array([[50, 1e-2], [50, 1e-2]])
 	gPick.weights_ = np.array([.5, .5])
 	Pick0 = Terminal('picker0', None, None, cb=lambda x:positive(x, [0,2], gPick))
 	Pick1 = Terminal('picker1', None, None, cb=lambda x:positive(x, [1,3], gPick))
-	Null = Terminal('N/A', None, None, cb=lambda x:negative(x, [0,1,2,3], gPick, gamma))
+	Null = Terminal('Nothing', None, None, cb=lambda x:negative(x, [0,1,2,3], gPick, gamma))
 
 	gDef = mixture.GMM(n_components=1)
 	gDef.means_ = np.array([[-60, 0]])
-	gDef.covars_ = np.array([[10, 1e-2]])
+	gDef.covars_ = np.array([[50, 1e-2]])
 	
 	defGood = Terminal('defence', None, None, cb=lambda x:defenceGood(x, range(4,12), gDef))
 	defBad = Terminal('defence miss', None, None, cb=lambda x:defenceBad(x, range(4,12), gDef, theta))
 
 	prods = [ ]
 	prods.append(Production(S, [NULL, PR], prob=1.))
-	prods.append(Production(PR, [PICK, Defence], prob=1.))
+	prods.append(Production(PR, [PICK, DefBad], prob=.5))
+	prods.append(Production(PR, [PICK, DefGood], prob=.5))
 	prods.append(Production(PICK, [Pick0, Block], prob=.5))
 	prods.append(Production(PICK, [Pick1, Block], prob=.5))
-	prods.append(Production(Defence, [Defence, defBad], prob=.8))
-	prods.append(Production(Defence, [defBad, defBad], prob=.2))
+	prods.append(Production(DefBad, [defBad, DefBad], prob=.8))
+	prods.append(Production(DefBad, [defBad, defBad], prob=.2))
+	prods.append(Production(DefGood, [defGood, DefGood], prob=.8))
+	prods.append(Production(DefGood, [defGood, defGood], prob=.2))
 	prods.append(Production(Pick0, [pick0, Pick], prob=.8))
 	prods.append(Production(Pick0, [pick0, pick0], prob=.2))
 	prods.append(Production(Pick1, [pick1, Pick], prob=.8))
@@ -591,35 +597,52 @@ def prGrammar(alpha=100, beta=-50, gamma=-200, theta=-500):
 	prods.append(Production(pick1, [Pick1, Pick1], prob=1.))
 	prods.append(Production(Block, [block, Block], prob=.8))
 	prods.append(Production(Block, [block, block], prob=.2))
-	prods.append(Production(NULL, [Null, NULL], prob=.8))
-	prods.append(Production(NULL, [Null, Null], prob=.2))
+	prods.append(Production(NULL, [Null, NULL], prob=.2))
+	prods.append(Production(NULL, [Null, Null], prob=.8))
 
 	return Grammar(S, prods)
 
 def recognition(args):
 	from template import Pts4 as HOOP
-	HOOP /= 2
-	HOOP = HOOP[0]
+	import pandas as pd
+	hoop = HOOP / 2
+
 	routes = np.load(args['route'])
 	dst = args['dst']
 	team = routes[-1,:,1]
 	coord = np.array( map(np.vstack, routes[...,0]))
 	m, n, _ = coord.shape
 	coord = movingaverage(coord.reshape(-1, 2*n), 10).reshape(m,n,2)
-	polar = cart2polar(coord.reshape(-1, 2), HOOP).reshape(m,n,2)
-
+	
+	if np.mean(coord[...,0]) > 800:
+		hoop = hoop[2]
+		team = np.logical_not(team)
+	else:
+		hoop = hoop[0]
+	print hoop
+	polar = cart2polar(coord.reshape(-1, 2), hoop).reshape(m,n,2)
+	
 	sampleData = np.hstack((pickVector(polar,team), defVector(polar,team), coord.reshape(-1, 8)))
 	grammar = prGrammar()
 	model = PCFG(grammar)
+	#import ipdb; ipdb.set_trace()
 	lik, tree = model.decode(sampleData)
+	df = pd.DataFrame(model._dtable)
+	df.plot(subplots=True)
+	#plt.show()
+	
 	decodes = []
 	for x in tree.BFS():
-		if x[1][0] == x[1][1]:
+		if x[1][0] == x[1][1]: 
 			decodes.append(x)
+
 	with open(dst, "wb") as csv_file:
 		writer = csv.writer(csv_file, delimiter=',')
-		for x in sorted(decodes, key=lambda x:x[1][0]):
-			writer.writerow(x)
+		for a, (b,c), d, e in sorted(decodes, key=lambda x:x[1][0]):
+			writer.writerow([a, b, d, e])
+			#print x
+			
+	#import ipdb; ipdb.set_trace()
 
 def main():
 	
