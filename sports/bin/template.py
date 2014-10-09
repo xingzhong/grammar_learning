@@ -1,6 +1,5 @@
-import numpy as np
-import cv2
 
+import numpy as np
 CLength = 2865	# 94ft
 CWidth = 1524	# 50ft
 LWidth = 488	# 16ft
@@ -51,12 +50,16 @@ POI = np.vstack((POI, Pts4, Pts6, Pts7, Pts8, Pts9, Pts10, Pts11))
 POI /= 2
 
 def visM():
+	
+	import cv2
 	courtPts = Pts2
 	framePts = [[100, 550], [0, 900], [550, 900], [550, 550]]
 	M = cv2.getPerspectiveTransform(np.float32(courtPts), np.float32(framePts))
 	return M
 
 def template():
+	
+	import cv2
 	tpl = np.uint8(np.zeros((2000, 3200)))
 	tpl = cv2.polylines(tpl,[Pts1, Pts2, Pts3, Pts5, Pts6], True, 255, 5)
 	tpl = cv2.ellipse(tpl, tuple(Pts4[0]), (TLine, TLine), 270, 21, 159, 255, 5)
@@ -78,6 +81,8 @@ def template():
 	return tpl
 
 def maskTpl():
+	
+	import cv2
 	tpl = np.uint8(np.zeros((2000, 3200, 3)))
 	cv2.rectangle(tpl, 
 			tuple(Pts1[0][0]-np.array([0,0])), 
@@ -87,6 +92,8 @@ def maskTpl():
 	return tpl
 
 if __name__ == '__main__':
+	
+	import cv2
 	tpl = template()
 	mask = maskTpl()
 	m = visM()

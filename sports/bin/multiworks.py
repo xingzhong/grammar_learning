@@ -96,8 +96,7 @@ def batch_vis():
 			df = pd.read_csv(decodeF, header=None)
 			idx = df.groupby(df[0]).first().sort(columns=1)[1]
 			keyFrames = zip( idx.index.values , getFrame(vidF, idx.values))
-
-			draw(keyFrames, epsF)
+			#draw(keyFrames, epsF)
 
 if __name__ == '__main__':
 	#batch_tracking()
