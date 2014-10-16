@@ -8,6 +8,7 @@ from sklearn.pcfg import PCFG, Production, Terminal, Grammar, Nonterminal
 from sklearn.mixture.gmm import log_multivariate_normal_density
 from itertools import combinations, permutations
 import csv 
+import random
 
 def movingaverage(interval, window_size):
     window = np.ones(int(window_size))/float(window_size)
@@ -568,8 +569,14 @@ def prGrammar(alpha=100, beta=-50, gamma=-100, theta=-100):
 	gPick.means_ = np.array([[-100, .3], [-100, -.3]])
 	gPick.covars_ = np.array([[50, 1e-2], [50, 1e-2]])
 	gPick.weights_ = np.array([.5, .5])
-	Pick0 = Terminal('picker0', None, None, cb=lambda x:positive(x, [0,2], gPick))
-	Pick1 = Terminal('picker1', None, None, cb=lambda x:positive(x, [1,3], gPick))
+
+	if random.random()>0.5:
+		Pick0 = Terminal('picker0', None, None, cb=lambda x:positive(x, [0,2], gPick))
+		Pick1 = Terminal('picker1', None, None, cb=lambda x:positive(x, [1,3], gPick))
+	else:
+		Pick0 = Terminal('picker0', None, None, cb=lambda x:positive(x, [1,3], gPick))
+		Pick1 = Terminal('picker1', None, None, cb=lambda x:positive(x, [0,2], gPick))
+
 	Null = Terminal('Nothing', None, None, cb=lambda x:negative(x, [0,1,2,3], gPick, gamma))
 
 	gDef = mixture.GMM(n_components=1)
@@ -608,6 +615,7 @@ def recognition(args):
 	hoop = HOOP / 2
 
 	routes = np.load(args['route'])
+	#import ipdb; ipdb.set_trace()
 	dst = args['dst']
 	team = routes[-1,:,1]
 	coord = np.array( map(np.vstack, routes[...,0]))
