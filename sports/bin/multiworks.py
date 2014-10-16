@@ -137,10 +137,7 @@ def batch_vis():
 			idx = idx.append(pd.Series({"end":len(df)-1}) )
 			keyFrames = zip( idx.index.values , getFrame(vidF, idx.values))
 			draw(keyFrames, epsF)
-	#import ipdb ; ipdb.set_trace()
-	#plt.show()
-	#plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-	#plt.savefig("../keyFrames.eps", format='eps', dpi=150)
+
 if __name__ == '__main__':
 	#batch_tracking()
 	#batch_recognition()
