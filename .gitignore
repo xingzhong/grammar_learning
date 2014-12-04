@@ -28,5 +28,4 @@ pip-log.txt
 .mr.developer.cfg
 
 *.swp
-*.png
 *.DS_Store
