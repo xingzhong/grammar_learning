@@ -7,5 +7,5 @@ setup(name='qcyk',
       author='Xingzhong Xu',
       author_email='xu@sirxu.com',
       license='MIT',
-      packages=['parsing', 'research'],
+      packages=['qcyk'],
       zip_safe=False)

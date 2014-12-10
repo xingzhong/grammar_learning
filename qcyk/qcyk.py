@@ -38,6 +38,26 @@ class qcyk(object):
 				else:
 					self.rules_lhs[a] = [ (b,c,p) ]
 
+	def initGrammar(self, fin):
+		with open(fin, 'r') as f:
+			for line in f:
+				if line[0] == '#':
+					continue
+				lhs, rhs = line.split('->')
+				lhs = lhs.strip()
+				rhs = map(lambda x: x.strip(), rhs.split())
+				rhs[-1] = math.log(float(rhs[-1][1:-1]))
+				if len(rhs) > 2 :
+					a,b,c,p = lhs, rhs[0], rhs[1], rhs[2]
+				else:
+					a,b,c,p = lhs, rhs[0], None, rhs[1]
+				self.rules[(a,b,c)] = p
+				if a in self.rules_lhs:
+					self.rules_lhs[a].append( (b, c, p) )
+				else:
+					self.rules_lhs[a] = [ (b,c,p) ]
+		#print self.rules
+
 	def parse(self):
 		lik = self.getGamma(0, self.length, 'S')
 		if lik > qcyk.MIN:
@@ -50,7 +70,22 @@ class qcyk(object):
 			root[-1].append( self.tree(start, k, y) )
 		if z:
 			root[-1].append( self.tree(k+1, end, z) )
-		return root	
+		return root
+
+	def pretty_print_tree(self, root, space=0):
+		s = "%s%s[%d:%d]\n"%("  "*space, root[0], root[1], root[2])
+		for c in root[-1]:
+			s += self.pretty_print_tree(c, space=space+1)
+		return s
+
+	def leafs(self, root):
+		if len(root[-1]) == 0:
+			return [root[:-1]]
+		else:
+			res = []
+			for c in root[-1]:
+				res.extend(self.leafs(c))
+			return res
 
 	def getGamma(self, i, j, v):
 		# v[i:k:j] -> y z 
@@ -61,9 +96,9 @@ class qcyk(object):
 			return qcyk.MIN
 		else:
 			y0, z0, k0, lik0 = None,None,-1,-1e10
-			print self.rules_lhs[v]
+			#print self.rules_lhs[v]
 			for (y, z, logP) in self.rules_lhs[v]:
-				print i, j, v, y, z
+				#print i, j, v, y, z
 				if z and (i!=j):
 					for k in range(i, j):
 						lik = self.getGamma(i, k, y) + self.getGamma(k+1, j, z) + logP
@@ -89,8 +124,9 @@ class qcyk(object):
 
 if __name__ == '__main__':
 	parser = qcyk()
-	parser.initTerminal("qcyk_cal_liks.csv")
-	parser.initRules('qcyk_cal_rules.csv')
+	parser.initGrammar("../test/grammar.gr")
+	#parser.initTerminal("qcyk_cal_liks.csv")
+	#parser.initRules('qcyk_cal_rules.csv')
 	print parser.parse()
 	
 	
