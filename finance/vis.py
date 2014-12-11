@@ -1,25 +1,24 @@
 from qcyk import qcyk
 import tempfile
+import cStringIO
 from terminal import terminal
 import matplotlib.pyplot as plt
+
 
 CS = {'RC': "#009933", 'BUR':"#009933", "BUT":"#009933",
 		"IHS":"#009933", "BBOT":"#009933", "FW":"#009933", 
 		"BER":"#CC3300", "BET":"#CC3300", "BTOP":"#CC3300", 
 		"FC":"#CC3300", "HS":"#CC3300", "RW":"#CC3300"}
 
-if __name__ == '__main__':
+def vis(ticker):
+	sio = cStringIO.StringIO()
 	likCache = tempfile.NamedTemporaryFile()
-	data = terminal('aapl', likCache.name, alpha=-3.0)
+	data = terminal(ticker, likCache.name, alpha=-3.0)
 	parser = qcyk()
 	parser.initGrammar('test.gr')
 	parser.initTerminal(likCache.name)
 	lik, tree = parser.parse()
 	likCache.close()
-
-	print parser.pretty_print_tree(tree)
-	print lik
-	
 
 	fig = plt.figure(figsize=(12,5))
 	ax = fig.add_subplot(111)
@@ -37,5 +36,10 @@ if __name__ == '__main__':
 			ax.axvspan(idx[xmin], idx[xmax], 
 				ymin=llow, ymax=hhigh, alpha=0.3, color=CS[t])
 			ax.annotate("%s"%(t), (center, high))
-	plt.show()
-	#import ipdb; ipdb.set_trace()
+	
+	plt.savefig(sio, format='png')
+	sio.seek(0)
+	return sio.getvalue()
+
+if __name__ == '__main__':
+	print vis('aapl')
