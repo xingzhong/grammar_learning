@@ -4,10 +4,10 @@ from zigzag import peak_valley_pivots
 import numpy as np
 import pandas as pd
 import datetime
-
+import os
 
 def fetch(ticker='spy', start=datetime.datetime(2008, 1, 1),
-		 end=datetime.datetime(2014, 1, 1)):
+		 end=datetime.datetime.now()):
 	return web.DataReader(ticker, 'google', start, end)
 
 def trend(x, y):
@@ -33,7 +33,7 @@ def dataXY(ticker, alpha=0.02):
 	F = map(lambda i: genFeature(X[..., i]), range(X.shape[-1]))
 	F = np.array(F)
 	return F, data
-	
+
 def likTable(F,m0,m1, fn, alpha):
 	with open(fn, "wb") as fileN:
 		for idx, f in enumerate(F):
@@ -47,11 +47,12 @@ def likTable(F,m0,m1, fn, alpha):
 			fileN.write("%d,%d,%s,%f\n"%(i, i, 'null', alpha))
 
 def terminal(ticker='spy', fn='test.csv', alpha=-2.0):
-	modelsFile = open('models.pkl', 'rb')
-	m0, m1 = pickle.load(modelsFile)
-	F, data = dataXY(ticker)
-	likTable(F, m0, m1, fn, alpha)
-	return data
+    model = os.path.dirname(os.path.realpath(__file__)) + '/models.pkl'
+    modelsFile = open(model, 'rb')
+    m0, m1 = pickle.load(modelsFile)
+    F, data = dataXY(ticker)
+    likTable(F, m0, m1, fn, alpha)
+    return data
 
 
 if __name__ == '__main__':

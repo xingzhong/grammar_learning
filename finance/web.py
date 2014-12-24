@@ -2,9 +2,11 @@ from flask import Flask, send_file
 from werkzeug.contrib.cache import SimpleCache
 from vis import vis
 from io import BytesIO
+#from werkzeug.contrib.cache import MemcachedCache
 
 app = Flask(__name__)
 cache = SimpleCache()
+#cache = MemcachedCache(['127.0.0.1:11211'])
 
 @app.route("/")
 def index(): return "index"
@@ -21,4 +23,4 @@ def pics(ticker):
 	return send_file(rv, mimetype='image/png')
 
 if __name__ == "__main__":
-	app.run(debug='True')
+	app.run('0.0.0.0', debug=True)
