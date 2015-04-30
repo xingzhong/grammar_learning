@@ -27,7 +27,9 @@ class SBG(object):
         for x in xrange(self.m):
             for y in xrange(self.n):
                 if len(self._d[x][y]) > 0 :
-                    self._img[x][y] = mode(self._d[x][y], axis=0)[0]
+                    #self._img[x][y] = mode(self._d[x][y], axis=0)[0]
+                    self._img[x][y] = np.mean(self._d[x][y], axis=0)
+                    #import ipdb; ipdb.set_trace()
                 else:
                     self._img[x][y] = np.array([0, 0, 0],dtype=np.uint8)
         return self._img
@@ -77,18 +79,19 @@ def f2f(bg, curr, bgMask):
     cv2.bitwise_or(bgMask, mask4, dst=bgMask)
     return H
 
-sss = "/home/xingzhong/Dropbox/dataset/f_"
-frameFiles = glob.glob('/home/xingzhong/Dropbox/dataset/f_*.png')
-frameFiles = sorted(frameFiles, key=lambda x:int(x[len(sss):-4]))
-frames = map(lambda x: cv2.imread(x)[...,np.newaxis], frameFiles)
-sX, sY = 3, 2
-M, N = int(1280*sX), int(720*sY)
-initM = np.array([[1.0,0, 3*1280/sX], [0,1.0, 720/sY], [0,0,1.0]])
-initF = cv2.warpPerspective(frames[0][...,0], initM, (M, N))
-mask = cv2.warpPerspective(np.zeros((720,1280), dtype=np.uint8), initM, (M, N), borderValue=255)
-mask = cv2.bitwise_not(mask)
-bg = SBG(initF, mask)
-for idx, frame in enumerate(frames[1:]):
-    f2f(bg, frame[...,0], mask)
-    cv2.imwrite('/home/xingzhong/Pictures/c_%s.png'%idx, bg.toImg())
-    cv2.imwrite('/home/xingzhong/Pictures/m_%s.png'%idx, bg.toMotion())
+if __name__ == '__main__':
+    sss = "/home/xingzhong/Dropbox/dataset/f_"
+    frameFiles = glob.glob('/home/xingzhong/Dropbox/dataset/f_*.png')
+    frameFiles = sorted(frameFiles, key=lambda x:int(x[len(sss):-4]))
+    frames = map(lambda x: cv2.imread(x)[...,np.newaxis], frameFiles)
+    sX, sY = 3, 2
+    M, N = int(1280*sX), int(720*sY)
+    initM = np.array([[1.0,0, 3*1280/sX], [0,1.0, 720/sY], [0,0,1.0]])
+    initF = cv2.warpPerspective(frames[0][...,0], initM, (M, N))
+    mask = cv2.warpPerspective(np.zeros((720,1280), dtype=np.uint8), initM, (M, N), borderValue=255)
+    mask = cv2.bitwise_not(mask)
+    bg = SBG(initF, mask)
+    for idx, frame in enumerate(frames[1:]):
+        f2f(bg, frame[...,0], mask)
+        cv2.imwrite('/home/xingzhong/Pictures/c_%s.png'%idx, bg.toImg())
+        cv2.imwrite('/home/xingzhong/Pictures/m_%s.png'%idx, bg.toMotion())
