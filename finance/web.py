@@ -9,7 +9,7 @@ cache = SimpleCache()
 #cache = MemcachedCache(['127.0.0.1:11211'])
 
 @app.route("/")
-def index(): return "index"
+def index(): +return "index"
 
 @app.route("/p/<ticker>")
 def pics(ticker):
