@@ -40,20 +40,26 @@ class SBG(object):
         self._d = np.concatenate((self._d, img[..., np.newaxis, :]), axis=2)
         self._mask = np.concatenate(
             (self._mask, mask[..., np.newaxis] > 0), axis=2)
+        print self._d.shape
+        print self._mask.shape
         # import ipdb; ipdb.set_trace()
 
     def toImg(self):
         mask = np.concatenate([self._mask[..., np.newaxis]] * 3, axis=3)
         data = ma.array(self._d, mask=mask)
-        img = np.mean(data, axis=2).filled(128).astype(np.uint8)
+        img = np.mean(data, axis=2).filled(0).astype(np.uint8)
         imgMask = np.all(self._mask, axis=2)
-        _, _, dl, _ = self._d.shape
-        # if dl > 10:
-        self._d = self._d[..., -1:-1, :]
-        self._mask = self._mask[..., -1:-1]
+        dm,dn,dp,dq = self._d.shape
+        mm,mn,mp = self._mask.shape
+        self._d = np.empty((dm, dn, 0, dq))
+        self._mask = np.empty((mm, mn, 0))
+        #self._d = self._d[..., -1:, :]
+        #self._mask = self._mask[..., -1:]
         self.add(img, imgMask)
-        test = 255 * imgMask
-        cv2.imshow('masktest', test.astype(np.uint8))
+        #print self._d.shape
+        #print self._mask.shape
+        #test = 255 * imgMask
+        #cv2.imshow('masktest', test.astype(np.uint8))
         return img
 
 lk_params = dict(winSize=(15, 15), maxLevel=2, criteria=(
@@ -96,7 +102,7 @@ class App:
         self.bg = None
         self.bgFrame = None
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        self.out = cv2.VideoWriter('/tmp/test.avi', fourcc, 20.0, (1280, 720))
+        self.out = cv2.VideoWriter('/tmp/test.avi', fourcc, 20.0, (2*1280, 720))
 
     def run(self):
         while True:
@@ -114,26 +120,31 @@ class App:
                 self.p0 = self.p0[trace_status].copy()
                 self.gray1 = frame_gray
 
-                if len(self.p0) < 800:
+                if len(self.p0) < 50:
                     self.p0 = None
+                    print 'limited key pts'
+                    #import ipdb; ipdb.set_trace()
                     continue
                 H, status = cv2.findHomography(
                     self.p0, self.p1, (0, cv2.RANSAC)[self.use_ransac], 1.5)
                 if H is None:
+                    print 'no homography found'
                     continue
 
                 self.incrH = np.dot(H, self.incrH)
                 self.incrH = self.incrH / self.incrH[2, 2]
-                print self.incrH
+                #print self.incrH
 
                 overlay = cv2.warpPerspective(self.frame0, H, (w, h))
+                xor = cv2.bitwise_xor(vis, overlay)
+                
                 vis = cv2.addWeighted(vis, 0.5, overlay, 0.5, 0.0)
                 proj = cv2.warpPerspective(frame, self.incrH, (2 * w, h),
                                            flags=cv2.WARP_INVERSE_MAP,
                                            borderMode=cv2.BORDER_CONSTANT,
                                            borderValue=(0, 0, 0))
 
-                xor = cv2.bitwise_xor(vis, overlay)
+                #xor = cv2.bitwise_xor(vis, overlay)
                 xor = cv2.cvtColor(xor, cv2.COLOR_BGR2GRAY)
                 xor = cv2.GaussianBlur(xor, (5, 5), 0)
                 ret, xor = cv2.threshold(xor, 20, 255, cv2.THRESH_BINARY)
@@ -154,12 +165,17 @@ class App:
                     bgFrame = cv2.warpPerspective(
                         self.bgFrame, self.incrH, (w, h))
                     test = cv2.addWeighted(bgFrame, .5, frame, .5, 0.0)
-                    cv2.imshow('test', test)
-                    cv2.imshow('bgFrame', bgFrame)
+                    #cv2.imshow('proj', proj)
+                    #cv2.imshow('bgFrame', bgFrame)
                     frame = bgFrame
                     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                cv2.imshow('forgrd', forgrd)
-                self.out.write(forgrd)
+                    
+                    bgout = cv2.addWeighted(proj, 0.5, self.bgFrame, 0.5, 0.0)
+                    T = cv2.bitwise_and(self.bgFrame, self.bgFrame, mask=mask)
+                    bgout = proj + T
+                    #cv2.imshow('bgout', bgout)
+                    self.out.write(bgout)
+
                 for (x0, y0), (x1, y1), good in zip(
                         self.p0[:, 0], self.p1[:, 0], status[:, 0]):
                     if good:
@@ -169,16 +185,19 @@ class App:
                 if self.use_ransac:
                     draw_str(vis, (20, 40), 'RANSAC')
             else:
-                proj = cv2.warpPerspective(frame, self.incrH, (2 * w, h),
+                if self.bg is None:
+                    proj = cv2.warpPerspective(frame, self.incrH, (2 * w, h),
                                            flags=cv2.WARP_INVERSE_MAP,
                                            borderMode=cv2.BORDER_CONSTANT,
                                            borderValue=(0, 0, 0))
-                self.blank = np.zeros((h, w)).astype(np.uint8)
-                mask = cv2.warpPerspective(self.blank, self.incrH, (2 * w, h),
+                    self.blank = np.zeros((h, w)).astype(np.uint8)
+                    self.blank = cv2.copyMakeBorder(
+                            self.blank,0,0,0,0,cv2.BORDER_CONSTANT,value=255)
+                    mask = cv2.warpPerspective(self.blank, self.incrH, (2 * w, h),
                                            flags=cv2.WARP_INVERSE_MAP,
                                            borderMode=cv2.BORDER_CONSTANT,
                                            borderValue=255)
-                self.bg = SBG(proj, mask)
+                    self.bg = SBG(proj, mask)
                 p = cv2.goodFeaturesToTrack(frame_gray, **feature_params)
                 if p is not None:
                     for x, y in p[:, 0]:
@@ -205,7 +224,7 @@ class App:
 
             if ch == ord('r'):
                 self.use_ransac = not self.use_ransac
-
+            #import ipdb; ipdb.set_trace()
         cv2.imwrite('/tmp/bg.png', self.bg.toImg())
 
 
