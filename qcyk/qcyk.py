@@ -115,7 +115,7 @@ class qcyk(object):
         return s
 
     def __repr__(self):
-        s = 'logLike = %.4f\n'%self.lik
+        s = 'logLike = %.4f\n'%self._lik
         return s + self.pretty_print_tree(self._tree)
 
     def leafs(self, root):
