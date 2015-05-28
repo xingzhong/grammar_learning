@@ -56,7 +56,7 @@ class qcyk(object):
 					self.rules_lhs[a].append( (b, c, p) )
 				else:
 					self.rules_lhs[a] = [ (b,c,p) ]
-		#print self.rules
+		print self.rules
 
 	def parse(self):
 		lik = self.getGamma(0, self.length, 'S')
@@ -98,7 +98,7 @@ class qcyk(object):
 			y0, z0, k0, lik0 = None,None,-1,-1e10
 			#print self.rules_lhs[v]
 			for (y, z, logP) in self.rules_lhs[v]:
-				#print i, j, v, y, z
+				print i, j, v, y, z
 				if z and (i!=j):
 					for k in range(i, j):
 						lik = self.getGamma(i, k, y) + self.getGamma(k+1, j, z) + logP
@@ -124,9 +124,9 @@ class qcyk(object):
 
 if __name__ == '__main__':
 	parser = qcyk()
-	parser.initGrammar("../test/grammar.gr")
-	#parser.initTerminal("qcyk_cal_liks.csv")
-	#parser.initRules('qcyk_cal_rules.csv')
+	#parser.initGrammar("../test/grammar.gr")
+	parser.initTerminal("../test/qcyk_cal_liks.csv")
+	parser.initRules('../test/qcyk_cal_rules.csv')
 	print parser.parse()
 	
 	
