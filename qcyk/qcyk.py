@@ -95,9 +95,9 @@ class qcyk(object):
     def parse(self):
         lik = self.getGamma(0, self.length, 'S')
         if lik > qcyk.MIN:
-            self.tree = self.tree(0, self.length, 'S')
-            self.lik = lik
-            return lik, self.tree
+            self._tree = self.tree(0, self.length, 'S')
+            self._lik = lik
+            return lik, self._tree
 
     def tree(self, start, end, nt):
         root = (nt, start, end, [])
@@ -116,7 +116,7 @@ class qcyk(object):
 
     def __repr__(self):
         s = 'logLike = %.4f\n'%self.lik
-        return s + self.pretty_print_tree(self.tree)
+        return s + self.pretty_print_tree(self._tree)
 
     def leafs(self, root):
         if len(root[-1]) == 0:
