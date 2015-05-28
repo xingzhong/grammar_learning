@@ -109,7 +109,10 @@ class qcyk(object):
         return root
 
     def pretty_print_tree(self, root, space=0):
-        s = "%s%s[%d:%d]\n"%("  "*space, root[0], root[1], root[2])
+        s = "%s%s [%d:%d] (%.4f)\n"%(
+            "  "*space, root[0], root[1], root[2],
+            self.gamma[(root[1], root[2], root[0])])
+        #import ipdb; ipdb.set_trace()
         for c in root[-1]:
             s += self.pretty_print_tree(c, space=space+1)
         return s
